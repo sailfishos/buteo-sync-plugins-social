@@ -382,7 +382,12 @@ QJsonObject kCalToJson(KCalCore::Event::Ptr event, KCalCore::ICalFormat &icalFor
 
     QJsonObject retn;
     if (!eventId.isEmpty()) retn.insert(QLatin1String("id"), eventId);
-    if (event->recurrence()) retn.insert(QLatin1String("recurrence"), recurrenceArray(event, icalFormat));
+    if (event->recurrence()) {
+        QJsonArray recArray = recurrenceArray(event, icalFormat);
+        if (recArray.size()) {
+            retn.insert(QLatin1String("recurrence"), recArray);
+        }
+    }
     retn.insert(QLatin1String("summary"), event->summary());
     retn.insert(QLatin1String("description"), event->description());
     retn.insert(QLatin1String("location"), event->location());
