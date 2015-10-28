@@ -2006,6 +2006,12 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally(int accountId)
         updateLocalCalendarNotebookEvents(accountId, updatedCalendarId);
         m_storageNeedsSave = true;
     }
+
+    // this becomes our new sync anchor.  In theory there could be lost updates because this timestamp will be greater
+    // than the point at which we requested local changes; but the alternative is cache the timestamp at the point
+    // just before we request local changes, and in that case, on the next sync we would get local changes (including additions)
+    // reported for every remote change which was applied above...
+    m_newSinceTimestamp[accountId] = QDateTime::currentDateTimeUtc(); // next sync should get all local changes made after this point in time.
 }
 
 void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(int accountId, const QString &calendarId)
@@ -2173,10 +2179,4 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(int accountId,
             m_storageNeedsSave = true;
         }
     }
-
-    // this becomes our new sync anchor.  In theory there could be lost updates because this timestamp will be greater
-    // than the point at which we requested local changes; but the alternative is cache the timestamp at the point
-    // just before we request local changes, and in that case, on the next sync we would get local changes (including additions)
-    // reported for every remote change which was applied above...
-    m_newSinceTimestamp[accountId] = QDateTime::currentDateTimeUtc(); // next sync should get all local changes made after this point in time.
 }
