@@ -362,7 +362,7 @@ KDateTime parseRecurrenceId(const QJsonObject &originalStartTime)
 QJsonObject kCalToJson(KCalCore::Event::Ptr event, KCalCore::ICalFormat &icalFormat, bool setUidProperty = false)
 {
     QString eventId = gCalEventId(event);
-    QJsonObject start, end;
+    QJsonObject start, end, reminders;
 
     // insert the date/time and timeZone information into the Json object.
     // note that timeZone is required for recurring events, for some reason.
@@ -391,6 +391,12 @@ QJsonObject kCalToJson(KCalCore::Event::Ptr event, KCalCore::ICalFormat &icalFor
     retn.insert(QLatin1String("sequence"), QString::number(event->revision()+1));
     //retn.insert(QLatin1String("locked"), event->readOnly()); // only allow locking server-side.
     // we may wish to support locking/readonly from local side also, in the future.
+
+    // if the event has no alarms associated with it, don't let Google add one automatically.
+    if (event->alarms().count() == 0) {
+        reminders.insert(QLatin1String("useDefault"), false);
+        retn.insert(QLatin1String("reminders"), reminders);
+    }
 
     if (setUidProperty) {
         // now we store private extended properties: local uid.
