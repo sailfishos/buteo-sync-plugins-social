@@ -128,7 +128,7 @@ namespace GoogleCalendarIncidenceComparator {
     }
 
     // Checks whether a specific set of properties are equal.
-    bool copiedPropertiesAreEqual(const KCalCore::Incidence::Ptr &a, const KCalCore::Incidence::Ptr &b, bool printDebug)
+    bool incidencesEqual(const KCalCore::Incidence::Ptr &a, const KCalCore::Incidence::Ptr &b, bool printDebug)
     {
         if (!a || !b) {
             qWarning() << "Invalid paramters! a:" << a << "b:" << b;

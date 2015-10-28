@@ -744,7 +744,7 @@ bool localModificationIsReal(const QJsonObject &local, const QJsonObject &remote
     KCalCore::Event::Ptr remoteEvent = KCalCore::Event::Ptr(new KCalCore::Event);
     jsonToKCal(local, localEvent, defaultReminderStartOffset, icalFormat, &changed);
     jsonToKCal(remote, remoteEvent, defaultReminderStartOffset, icalFormat, &changed);
-    if (GoogleCalendarIncidenceComparator::eventsEqual(localEvent, remoteEvent, true)) {
+    if (GoogleCalendarIncidenceComparator::incidencesEqual(localEvent, remoteEvent, true)) {
         return false; // they're equal, so the local modification is not real.
     }
     return true;
