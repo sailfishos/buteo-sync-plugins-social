@@ -119,15 +119,14 @@ void GoogleDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
         int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         QByteArray jsonBody = reply->readAll();
         qWarning() << "sociald:Google: would normally set CredentialsNeedUpdate for account"
-                   << reply->property("accountId").toInt() << "but could be spurious\n"
-                   << "    Http code:" << httpCode << "\n"
-                   << "    Json body:\n" << jsonBody << "\n";
+                   << reply->property("accountId").toInt() << "but could be spurious";
+        qWarning() << "    Http code:" << httpCode;
+        qWarning() << "    Json body:" << QString::fromUtf8(jsonBody).replace('\r', ' ').replace('\n', ' ');
     }
 
     SOCIALD_LOG_ERROR(SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
                       "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced error:" << err << "\n" <<
-                      QString::fromUtf8(reply->readAll()));
+                      "experienced error:" << err);
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.

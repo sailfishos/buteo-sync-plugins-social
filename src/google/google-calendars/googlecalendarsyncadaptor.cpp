@@ -717,7 +717,7 @@ void jsonToKCal(const QJsonObject &json, KCalCore::Event::Ptr event, int default
     UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, summary, setSummary, json.value(QLatin1String("summary")).toVariant().toString(), changed)
     UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, description, setDescription, json.value(QLatin1String("description")).toVariant().toString(), changed)
     UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, location, setLocation, json.value(QLatin1String("location")).toVariant().toString(), changed)
-    UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, revision, setRevision, json.value(QLatin1String("revision")).toVariant().toInt(), changed)
+    UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, revision, setRevision, json.value(QLatin1String("sequence")).toVariant().toInt(), changed)
     if (startExists) {
         UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, dtStart, setDtStart, start, changed)
     }
@@ -803,6 +803,19 @@ void setLastSyncSuccessful(QList<int> accountIds)
     settingsFile.sync();
 }
 
+void setLastSyncRequiresCleanSync(QList<int> accountIds)
+{
+    QString settingsFileName = QString::fromLatin1("%1/%2/gcal.ini")
+            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
+    QSettings settingsFile(settingsFileName, QSettings::IniFormat);
+    Q_FOREACH(int accountId, accountIds) {
+        settingsFile.setValue(QString::fromLatin1("%1-needCleanSync").arg(accountId), QVariant::fromValue<bool>(true));
+        settingsFile.setValue(QString::fromLatin1("%1-success").arg(accountId), QVariant::fromValue<bool>(false));
+    }
+    settingsFile.sync();
+}
+
 }
 
 GoogleCalendarSyncAdaptor::GoogleCalendarSyncAdaptor(QObject *parent)
@@ -854,16 +867,23 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
             } else {
                 // also update the remote sync timestamp in each notebook.
                 Q_FOREACH (const QString &updatedCalendarId, m_calendarsFinishedRequested.keys()) {
-                    // update the sync date for the notebook, to the timestamp reported by Google
-                    // in the calendar request for the remote calendar associated with the notebook.
+                    // Update the sync date for the notebook, to the timestamp reported by Google
+                    // in the calendar request for the remote calendar associated with the notebook,
+                    // if that timestamp is recent (within the last week).  If it is older than that,
+                    // update it to the current date minus one day, otherwise Google will return
+                    // 410 GONE "UpdatedMin too old" error on subsequent requests.
                     QString updateTimestamp = m_calendarsFinishedRequested.value(updatedCalendarId);
                     mKCal::Notebook::Ptr notebook = notebookForCalendarId(accountId, updatedCalendarId);
                     if (!notebook) {
                         // may have been deleted due to a purge operation.
                         continue;
                     }
-                    KDateTime syncDate = datetimeFromUpdateStr(updateTimestamp);
                     KDateTime oldSyncDate = notebook->syncDate();
+                    KDateTime syncDate = datetimeFromUpdateStr(updateTimestamp);
+                    KDateTime yesterdayDate = KDateTime::currentDateTime(KDateTime::Spec::UTC()).addDays(-1);
+                    if (qAbs(syncDate.daysTo(yesterdayDate)) >= 7) {
+                        syncDate = yesterdayDate;
+                    }
                     if (oldSyncDate < syncDate) {
                         notebook->setSyncDate(syncDate);
                     }
@@ -888,6 +908,15 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
     }
     if (succeededAccounts.size()) {
         setLastSyncSuccessful(succeededAccounts);
+    }
+    QList<int> cleanSyncAccounts;
+    Q_FOREACH (int accountId, m_cleanSyncRequired.keys()) {
+        if (m_cleanSyncRequired.value(accountId)) {
+            cleanSyncAccounts.append(accountId);
+        }
+    }
+    if (cleanSyncAccounts.size()) {
+        setLastSyncRequiresCleanSync(cleanSyncAccounts);
     }
 
     if (!ghostEventCleanupPerformed()) {
@@ -1064,8 +1093,8 @@ void GoogleCalendarSyncAdaptor::calendarsFinishedHandler()
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse calendar data from request with account" << accountId <<
-                          "; got:" << QString::fromLatin1(replyData.constData()));
+        SOCIALD_LOG_ERROR("unable to parse calendar data from request with account" << accountId << "; got:");
+        errorDumpStr(QString::fromLatin1(replyData.constData()));
         m_syncSucceeded[accountId] = false;
     }
 
@@ -1247,11 +1276,12 @@ void GoogleCalendarSyncAdaptor::eventsFinishedHandler()
     bool needCleanSync = reply->property("needCleanSync").toBool();
     QByteArray replyData = reply->readAll();
     bool isError = reply->property("isError").toBool();
+    int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
     QString replyString = QString::fromUtf8(replyData);
     SOCIALD_LOG_TRACE("-------------------------------");
     SOCIALD_LOG_TRACE("Events response for calendar:" << calendarId << "from account:" << accountId);
-    SOCIALD_LOG_TRACE("HTTP CODE:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+    SOCIALD_LOG_TRACE("HTTP CODE:" << httpCode);
     Q_FOREACH (QString line, replyString.split('\n', QString::SkipEmptyParts)) {
         SOCIALD_LOG_TRACE(line.replace('\r', ' '));
     }
@@ -1297,9 +1327,16 @@ void GoogleCalendarSyncAdaptor::eventsFinishedHandler()
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse event data from request with account" << accountId <<
-                          "; got: " << QString::fromUtf8(replyData.constData()));
+        SOCIALD_LOG_ERROR("unable to parse event data from request with account" << accountId << "; got:");
+        errorDumpStr(QString::fromUtf8(replyData.constData()));
         m_syncSucceeded[accountId] = false;
+
+        if (httpCode == 410) {
+            // HTTP 410 GONE is emitted if the syncToken or updatedMin parameters are invalid.
+            // We should trigger a clean sync if we hit this error.
+            SOCIALD_LOG_ERROR("received 410 GONE from server; marking account for clean sync:" << accountId);
+            m_cleanSyncRequired[accountId] = true;
+        }
     }
 
     if (!fetchingNextPage) {
@@ -1859,6 +1896,7 @@ void GoogleCalendarSyncAdaptor::upsyncFinishedHandler()
     QString calendarId = reply->property("calendarId").toString();
     int upsyncType = reply->property("upsyncType").toInt();
     QByteArray replyData = reply->readAll();
+    int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     bool isError = reply->property("isError").toBool();
 
     // QNetworkReply can report an error even if there isn't one...
@@ -1874,14 +1912,14 @@ void GoogleCalendarSyncAdaptor::upsyncFinishedHandler()
     // parse the calendars' metadata from the response.
     if (isError) {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("error occurred while upsyncing calendar data to Google account" << accountId <<
-                          "; got:" << QString::fromLatin1(replyData.constData()));
+        SOCIALD_LOG_ERROR("error" << httpCode << "occurred while upsyncing calendar data to Google account" << accountId << "; got:");
+        errorDumpStr(QString::fromUtf8(replyData));
         m_syncSucceeded[accountId] = false;
     } else if (upsyncType == GoogleCalendarSyncAdaptor::Delete) {
         // we expect an empty response body on success for Delete operations
         if (!replyData.isEmpty()) {
-            SOCIALD_LOG_ERROR("error occurred while upsyncing calendar event deletion to Google account" << accountId << "; got:");
-            errorDumpStr(QString::fromLatin1(replyData.constData()));
+            SOCIALD_LOG_ERROR("error" << httpCode << "occurred while upsyncing calendar event deletion to Google account" << accountId << "; got:");
+            errorDumpStr(QString::fromUtf8(replyData));
             m_syncSucceeded[accountId] = false;
         }
     } else {
@@ -1894,7 +1932,7 @@ void GoogleCalendarSyncAdaptor::upsyncFinishedHandler()
                             : QString::fromLatin1("modification");
             SOCIALD_LOG_ERROR("error occurred while upsyncing calendar event" << typeStr <<
                               "to Google account" << accountId << "; got:");
-            errorDumpStr(QString::fromLatin1(replyData.constData()));
+            errorDumpStr(QString::fromUtf8(replyData));
             m_syncSucceeded[accountId] = false;
         } else {
             // TODO: reduce code duplication between here and the other function.
