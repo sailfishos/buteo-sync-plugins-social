@@ -150,6 +150,13 @@ void FacebookImageSyncAdaptor::requestData(int accountId,
         QUrlQuery query(url);
         queryItems.append(QPair<QString, QString>(QString(QLatin1String("access_token")), accessToken));
         queryItems.append(QPair<QString, QString>(QString(QLatin1String("limit")), QString(QLatin1String("2000"))));
+        if (fbAlbumId.isEmpty()) {
+            queryItems.append(QPair<QString, QString>(QString(QLatin1String("fields")),
+                                                      QString(QLatin1String("id,from,name,created_time,updated_time,count"))));
+        } else {
+            queryItems.append(QPair<QString, QString>(QString(QLatin1String("fields")),
+                                                      QString(QLatin1String("id,picture,source,images,width,height,created_time,updated_time,name"))));
+        }
         query.setQueryItems(queryItems);
         url.setQuery(query);
     }
@@ -231,7 +238,7 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
         QString createdTimeStr = albumObject.value(QLatin1String("created_time")).toString();
         QString updatedTimeStr = albumObject.value(QLatin1String("updated_time")).toString();
         int imageCount = static_cast<int>(albumObject.value(QLatin1String("count")).toDouble());
-
+        SOCIALD_LOG_DEBUG("Got album information:" << userId << albumId << albumName << createdTimeStr << updatedTimeStr << imageCount);
 
         // check to see whether we need to sync (any changes since last sync)
         // Note that we also check if the image count is the same, since, when
@@ -257,7 +264,6 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
         // TODO: After successfully added an album, we should begin a new query to get the image
         // information (based on cover image id).
         requestData(accountId, accessToken, QString(), fbUserId, fbAlbumId);
-
     }
 
     // Perform a continuation request if required.
@@ -291,6 +297,7 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
     if (isError || !ok || !parsed.contains(QLatin1String("data"))) {
         SOCIALD_LOG_ERROR("unable to read photos response for Facebook account with id" << accountId);
+        SOCIALD_LOG_DEBUG(replyData);
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         decrementSemaphore(accountId);
         return;
@@ -305,8 +312,8 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
     }
 
     // read the photos information
-    foreach (const QJsonValue imageValue, data) {
-        QJsonObject imageObject = imageValue.toObject();
+    foreach (const QJsonValue &photoValue, data) {
+        QJsonObject imageObject = photoValue.toObject();
         if (imageObject.isEmpty()) {
             continue;
         }
@@ -319,6 +326,10 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
         QString photoName = imageObject.value(QLatin1String("name")).toString();
         int imageWidth = 0;
         int imageHeight = 0;
+        if (photoId.isEmpty()) {
+            SOCIALD_LOG_ERROR("Unable to parse photo id from data:" << photoValue.toObject().toVariantMap());
+            continue;
+        }
 
         // Find optimal thumbnail and image source urls based on dimensions.
         QList<ImageSource> imageSources;
@@ -344,11 +355,11 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
                 imageSrcUrl = img.sourceUrl;
             }
         }
-        if (!foundOptimalThumbnail) {
+        if (!foundOptimalThumbnail && imageSources.size()) {
             // just choose the largest one.
             thumbnailUrl = imageSources.last().sourceUrl;
         }
-        if (!foundOptimalImage) {
+        if (!foundOptimalImage && imageSources.size()) {
             // just choose the largest one.
             imageSrcUrl = imageSources.last().sourceUrl;
             imageWidth = imageSources.last().width;
@@ -362,12 +373,16 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
         }
 
         // check if we need to sync, and write to the database.
-        if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
-            SOCIALD_LOG_DEBUG("have previously cached photo" << photoId << ":" << imageSrcUrl);
+        if (!imageSrcUrl.isEmpty()) {
+            if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
+                SOCIALD_LOG_DEBUG("have previously cached photo" << photoId << ":" << imageSrcUrl);
+            } else {
+                SOCIALD_LOG_DEBUG("caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight);
+                m_db.addImage(photoId, fbAlbumId, fbUserId, createdTime, updatedTime,
+                              photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl);
+            }
         } else {
-            SOCIALD_LOG_DEBUG("caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight);
-            m_db.addImage(photoId, fbAlbumId, fbUserId, createdTime, updatedTime,
-                          photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl);
+            SOCIALD_LOG_ERROR("Cannot add photo to database:" << photoId << "- empty image source url!");
         }
     }
     // perform a continuation request if required.

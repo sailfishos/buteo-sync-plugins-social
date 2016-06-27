@@ -86,7 +86,7 @@ void FacebookNotificationSyncAdaptor::requestNotifications(int accountId, const 
     queryItems.append(QPair<QString, QString>(QString(QLatin1String("include_read")), QString(QLatin1String("true"))));
     queryItems.append(QPair<QString, QString>(QString(QLatin1String("access_token")), accessToken));
     queryItems.append(QPair<QString, QString>(QString(QLatin1String("locale")), QLocale::system().name()));
-    QUrl url(graphAPI(QLatin1String("/me/notifications")));
+    QUrl url(QLatin1String("https://graph.facebook.com/v2.3/me/notifications")); // removed after v2.3, cannot use in v2.6!
     if (pagingToken.isEmpty()) {
         QDateTime since = lastSuccessfulSyncTime(accountId);
         if (!since.isValid()) {
@@ -103,6 +103,8 @@ void FacebookNotificationSyncAdaptor::requestNotifications(int accountId, const 
         queryItems.append(QPair<QString, QString>(QString(QLatin1String("until")), until));
         queryItems.append(QPair<QString, QString>(QString(QLatin1String("__paging_token")), pagingToken));
     }
+    queryItems.append(QPair<QString, QString>(QString(QLatin1String("fields")),
+                                              QString(QLatin1String("id,from,to,application,object,created_time,updated_time,title,link"))));
 
     QUrlQuery query(url);
     query.setQueryItems(queryItems);
