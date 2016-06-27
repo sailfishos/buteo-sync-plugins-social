@@ -28,6 +28,8 @@
 #include <QtCore/QJsonArray>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
+#include <QtNetwork/QHttpMultiPart>
+#include <QtNetwork/QHttpPart>
 
 #include <extendedcalendar.h>
 #include <extendedstorage.h>
@@ -199,23 +201,21 @@ void FacebookCalendarSyncAdaptor::requestEvents(int accountId,
                                                 const QString &accessToken,
                                                 const QString &batchRequest)
 {
-    QList<QPair<QString, QString> > queryItems;
-    queryItems.append(QPair<QString, QString>(QString(QLatin1String("access_token")), accessToken));
 
     QString batch = batchRequest;
     if (batch.isEmpty()) {
         // Create batch query of following format:
-        //    [{ "method":"GET","relative_url":"me/events/created?include_headers=false&limit=200"},
-        //     { "method":"GET","relative_url":"me/events/attending?include_headers=false&limit=200"},
-        //     { "method":"GET","relative_url":"me/events/maybe?include_headers=false&limit=200"},
-        //     { "method":"GET","relative_url":"me/events/not_replied?include_headers=false&limit=200"}]
+        //    [{ "method":"GET","relative_url":"me/events?type=created&include_headers=false&limit=200&fields=..."},
+        //     { "method":"GET","relative_url":"me/events?type=attending&include_headers=false&limit=200&fields=..."},
+        //     { "method":"GET","relative_url":"me/events?type=maybe&include_headers=false&limit=200&fields=..."},
+        //     { "method":"GET","relative_url":"me/events?type=not_replied&include_headers=false&limit=200&fields=..."}]
 
         int sinceSpan = m_accountSyncProfile
                 ? m_accountSyncProfile->key(Buteo::KEY_SYNC_SINCE_DAYS_PAST, QStringLiteral("30")).toInt()
                 : 30;
         uint startTime = QDateTime::currentDateTimeUtc().addDays(sinceSpan * -1).toTime_t();
         QString since = QStringLiteral("since=") + QString::number(startTime);
-        QString calendarQuery = QStringLiteral("{\"method\":\"GET\",\"relative_url\":\"me/events/%1?fields=id,name,start_time,end_time,is_date_only,description,location&include_headers=false&limit=200&")
+        QString calendarQuery = QStringLiteral("{\"method\":\"GET\",\"relative_url\":\"me/events?type=%1&include_headers=false&limit=200&fields=id,name,start_time,end_time,description,place&")
                                   + since
                                   + QStringLiteral("\"}");
 
@@ -226,17 +226,27 @@ void FacebookCalendarSyncAdaptor::requestEvents(int accountId,
               + calendarQuery.arg(QStringLiteral("not_replied"))
               + QStringLiteral("]");
     }
-    queryItems.append(QPair<QString, QString>(QString(QLatin1String("batch")), batch));
 
     QUrl url(graphAPI());
-    QUrlQuery query(url);
-    query.setQueryItems(queryItems);
-    url.setQuery(query);
+    QNetworkRequest request(url);
 
-    SOCIALD_LOG_DEBUG("performing request:" << url.toString());
+    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+    multiPart->setBoundary("-------Sska2129ifcalksmqq3");
 
-    QNetworkReply *reply = m_networkAccessManager->post(QNetworkRequest(url), QByteArray());
+    QHttpPart accessTokenPart;
+    accessTokenPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"access_token\""));
+    accessTokenPart.setBody(accessToken.toUtf8());
+
+    QHttpPart batchPart;
+    batchPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"batch\""));
+    batchPart.setBody(batch.toUtf8());
+
+    multiPart->append(accessTokenPart);
+    multiPart->append(batchPart);
+    request.setRawHeader("Content-Type", "multipart/form-data; boundary="+multiPart->boundary());
+    QNetworkReply *reply = m_networkAccessManager->post(request, multiPart);
     if (reply) {
+        multiPart->setParent(reply);
         reply->setProperty("accountId", accountId);
         reply->setProperty("accessToken", accessToken);
         connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
@@ -251,6 +261,7 @@ void FacebookCalendarSyncAdaptor::requestEvents(int accountId,
         }
         setupReplyTimeout(accountId, reply);
     } else {
+        delete multiPart;
         SOCIALD_LOG_ERROR("unable to request events from Facebook account" << accountId);
     }
 }
@@ -343,39 +354,27 @@ void FacebookCalendarSyncAdaptor::finishedHandler()
                     // workaround for empty ET events
                     endTimeString = startTimeString;
                 }
-                parsedEvent.m_isDateOnly = dataMap.value(QLatin1String("is_date_only")).toBool();
-                parsedEvent.m_endExists = true;
-                if (!parsedEvent.m_isDateOnly) {
-                    KDateTime parsedStartTime = KDateTime::fromString(startTimeString);
-                    KDateTime parsedEndTime = KDateTime::fromString(endTimeString);
 
-                    // Sometimes KDateTime cannot parse the timezone
-                    // even if it should support it
-                    // We are then doing it manually
-                    if (parsedStartTime.isNull()) {
-                        parsedStartTime = KDateTime::fromString(startTimeString,
-                                                                QLatin1String("%Y-%m-%dT%H:%M:%S%z"));
-                    }
-                    if (parsedEndTime.isNull()) {
-                        parsedEndTime = KDateTime::fromString(endTimeString,
-                                                              QLatin1String("%Y-%m-%dT%H:%M:%S%z"));
-                    }
-                    parsedEvent.m_startTime = parsedStartTime.toLocalZone();
-                    parsedEvent.m_endTime = parsedEndTime.toLocalZone();
-                } else {
-                    // mkcal date-only event semantics:
-                    // if a date-only event lasts only one day, set isAllDay to true, but don't set an end date.
-                    // if a date-only event lasts multiple days, set isAllDay to true, and set an end date.
-                    // Use ClockTime format, so that it doesn't get offset according to timezone.
-                    parsedEvent.m_startTime = KDateTime(QLocale::c().toDate(startTimeString, QLatin1String("yyyy-MM-dd")), QTime(), KDateTime::ClockTime);
-                    parsedEvent.m_endTime   = KDateTime(QLocale::c().toDate(endTimeString,   QLatin1String("yyyy-MM-dd")), QTime(), KDateTime::ClockTime);
-                    if (parsedEvent.m_endTime == parsedEvent.m_startTime) {
-                        parsedEvent.m_endExists = false; // single-day all day event; don't set endDt.
-                    }
+                KDateTime parsedStartTime = KDateTime::fromString(startTimeString);
+                KDateTime parsedEndTime = KDateTime::fromString(endTimeString);
+
+                // Sometimes KDateTime cannot parse the timezone
+                // even if it should support it
+                // We are then doing it manually
+                if (parsedStartTime.isNull()) {
+                    parsedStartTime = KDateTime::fromString(startTimeString,
+                                                            QLatin1String("%Y-%m-%dT%H:%M:%S%z"));
                 }
+                if (parsedEndTime.isNull()) {
+                    parsedEndTime = KDateTime::fromString(endTimeString,
+                                                          QLatin1String("%Y-%m-%dT%H:%M:%S%z"));
+                }
+
+                parsedEvent.m_startTime = parsedStartTime.toLocalZone();
+                parsedEvent.m_endTime = parsedEndTime.toLocalZone();
                 parsedEvent.m_summary = dataMap.value(QLatin1String("name")).toString();
                 parsedEvent.m_description = dataMap.value(QLatin1String("description")).toString();
-                parsedEvent.m_location = dataMap.value(QLatin1String("location")).toString();
+                parsedEvent.m_location = dataMap.value(QLatin1String("place")).toObject().toVariantMap().value("name").toString();
                 m_parsedEvents[eventId] = parsedEvent;
             }
         }
