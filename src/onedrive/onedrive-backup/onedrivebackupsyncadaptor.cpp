@@ -108,7 +108,7 @@ void OneDriveBackupSyncAdaptor::beginSync(int accountId, const QString &accessTo
     SsuDeviceInfo deviceInfo;
     QString deviceId = deviceInfo.deviceUid();
     QByteArray hashedDeviceId = QCryptographicHash::hash(deviceId.toUtf8(), QCryptographicHash::Sha256);
-    QString encodedDeviceId = QString::fromUtf8(hashedDeviceId.toBase64()).mid(0,12);
+    QString encodedDeviceId = QString::fromUtf8(hashedDeviceId.toBase64(QByteArray::Base64UrlEncoding)).mid(0,12);
     if (deviceId.isEmpty()) {
         SOCIALD_LOG_ERROR("Could not determine device identifier; cannot create remote per-device backup directory!");
         setStatus(SocialNetworkSyncAdaptor::Error);
