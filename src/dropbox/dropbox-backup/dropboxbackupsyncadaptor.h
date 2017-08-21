@@ -30,6 +30,7 @@
 #include <QtCore/QVariantMap>
 #include <QtCore/QList>
 #include <QtCore/QStringList>
+#include <QtCore/QSet>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QSslError>
 #include <QtSql/QSqlDatabase>
@@ -52,9 +53,12 @@ protected: // implementing DropboxDataTypeSyncAdaptor interface
     void finalCleanup();
 
 private:
+    void requestList(int accountId, const QString &accessToken,
+                     const QString &localPath, const QString &remotePath,
+                     const QString &remoteFile, const QString &continuationCursor);
     void requestData(int accountId, const QString &accessToken,
                      const QString &localPath, const QString &remotePath,
-                     const QString &remoteFile = QString(), const QString &redirectUrl = QString());
+                     const QString &remoteFile = QString());
     void uploadData(int accountId, const QString &accessToken,
                     const QString &localPath, const QString &remotePath,
                     const QString &localFile = QString());
@@ -67,6 +71,9 @@ private Q_SLOTS:
     void createRemoteFileFinishedHandler();
     void downloadProgressHandler(qint64 bytesReceived, qint64 bytesTotal);
     void uploadProgressHandler(qint64 bytesSent, qint64 bytesTotal);
+
+private:
+    QSet<QString> m_backupFiles;
 };
 
 #endif // DROPBOXBACKUPSYNCADAPTOR_H

@@ -287,7 +287,13 @@ void DropboxDataTypeSyncAdaptor::signOnResponse(const SignOn::SessionData &respo
     }
 
     m_api = account->value(QStringLiteral("hosts/ApiHost")).toString();
+    if (m_api.isEmpty()) {
+        m_api = QStringLiteral("https://api.dropboxapi.com");
+    }
     m_content = account->value(QStringLiteral("hosts/ContentHost")).toString();
+    if (m_content.isEmpty()) {
+        m_content = QStringLiteral("https://content.dropboxapi.com");
+    }
 
     session->disconnect(this);
     identity->destroySession(session);
