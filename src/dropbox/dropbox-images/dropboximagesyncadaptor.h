@@ -29,6 +29,7 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QVariantMap>
 #include <QtCore/QList>
+#include <QtCore/QJsonArray>
 #include <QtSql/QSqlDatabase>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
@@ -55,11 +56,13 @@ protected: // implementing DropboxDataTypeSyncAdaptor interface
     void finalize(int accountId);
 
 private:
-    void queryCameraRoll(int accountId, const QString &accessToken);
+    void queryCameraRollCursor(int accountId, const QString &accessToken);
+    void queryCameraRoll(int accountId, const QString &accessToken, const QString &albumId, const QString &cursor, const QString &continuationCursor);
     bool haveAlreadyCachedImage(const QString &fbImageId, const QString &imageUrl);
     void possiblyAddNewUser(const QString &fbUserId, int accountId, const QString &accessToken);
 
 private Q_SLOTS:
+    void cameraRollCursorFinishedHandler();
     void cameraRollFinishedHandler();
     void userFinishedHandler();
 
@@ -73,20 +76,13 @@ private:
     QStringList m_removedImages;
 
     DropboxImagesDatabase m_db;
+    SocialImagesDatabase m_imageCacheDb;
 
-    // image variants with different dimentions
-    class ImageSource {
-    public:
-        ImageSource(int width, int height, const QString &sourceUrl) : width(width), height(height), sourceUrl(sourceUrl) {}
-        bool operator<(const ImageSource &other) const { return this->width < other.width; }
-        int width;
-        int height;
-        QString sourceUrl;
-    };
+    QJsonArray m_retrievedObjects;
+
     bool determineOptimalDimensions();
     int m_optimalThumbnailWidth;
     int m_optimalImageWidth;
-    SocialImagesDatabase m_imageCacheDb;
 };
 
 #endif // DROPBOXIMAGESYNCADAPTOR_H

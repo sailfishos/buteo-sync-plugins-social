@@ -45,6 +45,21 @@
 // ~/.config/sociald/images directory, and filling the ~/.config/sociald/images/dropbox.db
 // with appropriate data.
 
+namespace {
+    bool filenameHasImageExtension(const QString &filename) {
+        if (filename.endsWith(".jpg", Qt::CaseInsensitive)  ||
+            filename.endsWith(".jpeg", Qt::CaseInsensitive) ||
+            filename.endsWith(".png", Qt::CaseInsensitive)  ||
+            filename.endsWith(".tiff", Qt::CaseInsensitive) ||
+            filename.endsWith(".tif", Qt::CaseInsensitive)  ||
+            filename.endsWith(".gif", Qt::CaseInsensitive)  ||
+            filename.endsWith(".bmp", Qt::CaseInsensitive)) {
+            return true;
+        }
+        return false;
+    }
+}
+
 DropboxImageSyncAdaptor::DropboxImageSyncAdaptor(QObject *parent)
     : DropboxDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::Images, parent)
     , m_optimalThumbnailWidth(0)
@@ -94,8 +109,8 @@ void DropboxImageSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyn
 
 void DropboxImageSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
-    queryCameraRoll(accountId, accessToken);
-    // requestAlbums(accountId, accessToken);
+    possiblyAddNewUser(QString::number(accountId), accountId, accessToken);
+    queryCameraRollCursor(accountId, accessToken);
 }
 
 void DropboxImageSyncAdaptor::finalize(int accountId)
@@ -121,19 +136,128 @@ void DropboxImageSyncAdaptor::finalize(int accountId)
     }
 }
 
-void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &accessToken)
+void DropboxImageSyncAdaptor::queryCameraRollCursor(int accountId, const QString &accessToken)
 {
-    QUrl url(QStringLiteral("%1/1/metadata/auto/Pictures").arg(api()));
+    QJsonObject requestParameters;
+    requestParameters.insert("path", "/Pictures");
+    requestParameters.insert("recursive", false);
+    requestParameters.insert("include_media_info", true);
+    requestParameters.insert("include_deleted", false);
+    requestParameters.insert("include_has_explicit_shared_members", false);
+    QJsonDocument doc;
+    doc.setObject(requestParameters);
+    QByteArray postData = doc.toJson(QJsonDocument::Compact);
+
+    QUrl url(QStringLiteral("%1/2/files/list_folder/get_latest_cursor").arg(api()));
     QNetworkRequest req;
     req.setUrl(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setHeader(QNetworkRequest::ContentLengthHeader, postData.size());
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                      QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
-    SOCIALD_LOG_DEBUG("querying camera roll:" << url.toString());
 
-    QNetworkReply *reply = m_networkAccessManager->get(req);
+    SOCIALD_LOG_DEBUG("querying camera roll cursor:" << url.toString());
+
+    QNetworkReply *reply = m_networkAccessManager->post(req, postData);
     if (reply) {
         reply->setProperty("accountId", accountId);
         reply->setProperty("accessToken", accessToken);
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, SIGNAL(finished()), this, SLOT(cameraRollCursorFinishedHandler()));
+
+        // we're requesting data.  Increment the semaphore so that we know we're still busy.
+        incrementSemaphore(accountId);
+        setupReplyTimeout(accountId, reply);
+    } else {
+        SOCIALD_LOG_ERROR("unable to request data from Dropbox account with id" << accountId);
+        clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
+    }
+}
+
+void DropboxImageSyncAdaptor::cameraRollCursorFinishedHandler()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    bool isError = reply->property("isError").toBool();
+    int accountId = reply->property("accountId").toInt();
+    QString accessToken = reply->property("accessToken").toString();
+    QString continuationUrl = reply->property("continuationUrl").toString();
+    QByteArray replyData = reply->readAll();
+    disconnect(reply);
+    reply->deleteLater();
+    removeReplyTimeout(accountId, reply);
+
+    bool ok = false;
+    QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
+
+    if (isError || !ok || parsed.contains("error")) {
+        SOCIALD_LOG_ERROR("unable to read Pictures cursor response for Dropbox account with id" << accountId);
+        if (reply->error() == QNetworkReply::ContentNotFoundError) {
+            SOCIALD_LOG_DEBUG("Possibly" << reply->request().url().toString()
+                              << "is not available on server because no photos have been uploaded yet");
+        }
+        QString errorResponse = QString::fromUtf8(replyData);
+        Q_FOREACH (const QString &line, errorResponse.split('\n')) {
+            SOCIALD_LOG_DEBUG(line);
+        }
+        clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
+        decrementSemaphore(accountId);
+        return;
+    }
+
+    QString cursor = parsed.value(QLatin1String("cursor")).toString();
+    QString userId = QString::number(accountId);
+    QString albumId = "DropboxPictures-" + userId; // in future we might have multiple dropbox accounts
+    const DropboxAlbum::ConstPtr &dbAlbum = m_cachedAlbums.value(albumId);
+    m_cachedAlbums.remove(albumId); // this album exists, so remove it from the removal detection delta.
+    if (!dbAlbum.isNull() && dbAlbum->hash() == cursor) {
+        SOCIALD_LOG_DEBUG("album with id" << albumId << "by user" << userId <<
+                          "from Dropbox account with id" << accountId << "doesn't need sync");
+        decrementSemaphore(accountId);
+        return;
+    }
+
+    // some changes have occurred, we need to sync.
+    queryCameraRoll(accountId, accessToken, albumId, cursor, QString());
+    decrementSemaphore(accountId);
+}
+
+void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &accessToken, const QString &albumId, const QString &cursor, const QString &continuationCursor)
+{
+    QJsonObject requestParameters;
+    if (continuationCursor.isEmpty()) {
+        requestParameters.insert("path", "/Pictures");
+        requestParameters.insert("include_media_info", true);
+        requestParameters.insert("include_deleted", false);
+        requestParameters.insert("include_has_explicit_shared_members", false);
+    } else {
+        requestParameters.insert("cursor", continuationCursor);
+    }
+    QJsonDocument doc;
+    doc.setObject(requestParameters);
+    QByteArray postData = doc.toJson(QJsonDocument::Compact);
+
+    QUrl url;
+    if (continuationCursor.isEmpty()) {
+        url = QUrl(QStringLiteral("%1/2/files/list_folder").arg(api()));
+    } else {
+        url = QUrl(QStringLiteral("%1/2/files/list_folder_continue").arg(api()));
+    }
+    QNetworkRequest req;
+    req.setUrl(url);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    req.setHeader(QNetworkRequest::ContentLengthHeader, postData.size());
+    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
+                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+
+    SOCIALD_LOG_DEBUG("querying camera roll:" << url.toString());
+
+    QNetworkReply *reply = m_networkAccessManager->post(req, postData);
+    if (reply) {
+        reply->setProperty("accountId", accountId);
+        reply->setProperty("accessToken", accessToken);
+        reply->setProperty("albumId", albumId);
+        reply->setProperty("cursor", cursor);
         connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
         connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
         connect(reply, SIGNAL(finished()), this, SLOT(cameraRollFinishedHandler()));
@@ -153,11 +277,14 @@ void DropboxImageSyncAdaptor::cameraRollFinishedHandler()
     bool isError = reply->property("isError").toBool();
     int accountId = reply->property("accountId").toInt();
     QString accessToken = reply->property("accessToken").toString();
-    QString continuationUrl = reply->property("continuationUrl").toString();
+    QString albumId = reply->property("albumId").toString();
+    QString cursor = reply->property("cursor").toString();
     QByteArray replyData = reply->readAll();
     disconnect(reply);
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
+
+qWarning() << "Got replyData:" << replyData;
 
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
@@ -177,128 +304,89 @@ void DropboxImageSyncAdaptor::cameraRollFinishedHandler()
         return;
     }
 
-    QString albumId = "DropboxPictures-" + QString::number(accountId) ; // in future we might have multiple dropbox accounts
-    QString albumName = "Pictures"; // TODO: where this is used, do we need to translate?
-    QString createdTimeStr = parsed.value(QLatin1String("created_time")).toString();
-    QString updatedTimeStr = parsed.value(QLatin1String("updated_time")).toString();
-    int imageCount = static_cast<int>(parsed.value(QLatin1String("count")).toDouble());
+    // read the pictures information
+    QJsonArray data = parsed.value(QLatin1String("entries")).toArray();
+    for (int i = 0; i < data.size(); ++i) {
+        QJsonObject fileObject = data.at(i).toObject();
+        const QString &remoteFilePath = fileObject.value("path_display").toString();
+        if (!fileObject.isEmpty() && filenameHasImageExtension(remoteFilePath)) {
+            m_retrievedObjects.append(fileObject);
+        }
+    }
 
-    QString albumHash = parsed.value(QLatin1String("hash")).toString(); // This is used to check if anything has changed since last query.
-    QJsonArray data = parsed.value(QLatin1String("contents")).toArray();
-    if (data.size() == 0) {
-        SOCIALD_LOG_DEBUG("Dropbox account with id" << accountId << "has no Pictures");
+    QString continuationCursor = parsed.value(QLatin1String("cursor")).toString();
+    bool hasMore = parsed.value(QLatin1String("has_more")).toBool();
+
+    if (hasMore) {
+        queryCameraRoll(accountId, accessToken, albumId, cursor, continuationCursor);
+    } else {
+        // we have retrieved all of the image file objects data.
+        QString userId = QString::number(accountId);
+        QString albumName = "Pictures"; // TODO: do we need to translate?
+        m_db.syncAccount(accountId, userId);
+        m_db.addAlbum(albumId, userId, QDateTime(), QDateTime(), albumName, m_retrievedObjects.size(), cursor);
+
+        // process the objects and update the database.
+        for (int i = 0; i < m_retrievedObjects.size(); ++i) {
+            QJsonObject fileObject = m_retrievedObjects.at(i).toObject();
+            const QString &remoteFilePath = fileObject.value("path_display").toString();
+            QString photoId = fileObject.value(QLatin1String("rev")).toString();
+            QString photoName = remoteFilePath.split("/").last();
+            int imageWidth = fileObject.value(QLatin1String("media_info")).toObject().value(QLatin1String("dimensions")).toObject().value(QLatin1String("width")).toInt();
+            int imageHeight = fileObject.value(QLatin1String("media_info")).toObject().value(QLatin1String("dimensions")).toObject().value(QLatin1String("height")).toInt();
+            if (imageWidth == 0 || imageHeight == 0) {
+                imageWidth = 768;
+                imageHeight = 1024;
+            }
+
+            QString createdTimeStr = fileObject.value(QLatin1String("client_modified")).toString();
+            QDateTime createdTime = QDateTime::fromString(createdTimeStr, Qt::ISODate);
+            QString updatedTimeStr = fileObject.value(QLatin1String("server_modified")).toString();
+            QDateTime updatedTime = QDateTime::fromString(updatedTimeStr, Qt::ISODate);
+            if (!m_serverImageIds[albumId].contains(photoId)) {
+                m_serverImageIds[albumId].insert(photoId);
+            }
+
+            QString thumbnailAPIUrl = content() + "/2/files/get_thumbnail";
+            QString fileAPIUrl = content() + "/2/files/download";
+
+            QString thumbnailSizeStr;
+            if (m_optimalThumbnailWidth <= 32) {
+                thumbnailSizeStr = "w32h32";
+            } else if (m_optimalThumbnailWidth <= 64) {
+                thumbnailSizeStr = "w64h64";
+            } else if (m_optimalThumbnailWidth <= 128) {
+                thumbnailSizeStr = "w128h128";
+            } else if (m_optimalThumbnailWidth <= 480) {
+                thumbnailSizeStr = "w640h480";
+            } else {
+                thumbnailSizeStr = "w1024h768";
+            }
+
+            QJsonObject thumbnailQueryObject;
+            thumbnailQueryObject.insert("path", remoteFilePath);
+            thumbnailQueryObject.insert("format", "jpeg");
+            thumbnailQueryObject.insert("size", thumbnailSizeStr);
+            QByteArray thumbnailQueryArg = QJsonDocument(thumbnailQueryObject).toJson(QJsonDocument::Compact);
+            QString thumbnailUrl = thumbnailAPIUrl + "?arg=" + QString::fromUtf8(thumbnailQueryArg.toPercentEncoding());
+
+            QJsonObject fileQueryObject;
+            fileQueryObject.insert("path", remoteFilePath);
+            QByteArray fileQueryArg = QJsonDocument(fileQueryObject).toJson(QJsonDocument::Compact);
+            QString imageSrcUrl = fileAPIUrl + "?arg=" + QString::fromUtf8(fileQueryArg.toPercentEncoding());
+
+            // check if we need to sync, and write to the database.
+            if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
+                SOCIALD_LOG_DEBUG("have previously cached photo" << photoId << ":" << imageSrcUrl);
+            } else {
+                SOCIALD_LOG_DEBUG("caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight);
+                m_db.addImage(photoId, albumId, userId, createdTime, updatedTime,
+                              photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl, accessToken);
+            }
+        }
         checkRemovedImages(albumId);
-        decrementSemaphore(accountId);
-        return;
     }
 
-    // read the albums information
-    for (int i = 0; i < data.size(); ++i) {
-        QJsonObject fileObject = data.at(i).toObject();
-        if (fileObject.isEmpty() || !fileObject.value("mime_type").toString().startsWith("image")) {
-            continue;
-        }
-        imageCount++;
-    }
-
-    QString userId = QString::number(accountId) ;
-    QDateTime createdTime = QDateTime::fromString(createdTimeStr, Qt::ISODate);
-    QDateTime updatedTime = QDateTime::fromString(updatedTimeStr, Qt::ISODate);
-
-    const DropboxAlbum::ConstPtr &dbAlbum = m_cachedAlbums.value(albumId);
-    m_cachedAlbums.remove(albumId);  // Removal detection
-
-    if (!dbAlbum.isNull() && (dbAlbum->hash() == albumHash
-                              && dbAlbum->imageCount() == imageCount)) {
-        SOCIALD_LOG_DEBUG("album with id" << albumId << "by user" << userId <<
-                          "from Dropbox account with id" << accountId << "doesn't need sync");
-        decrementSemaphore(accountId);
-        return;
-    }
-
-    possiblyAddNewUser(userId, accountId, accessToken);
-    m_db.syncAccount(accountId, userId);
-    m_db.addAlbum(albumId, userId, createdTime, updatedTime, albumName, imageCount, albumHash);
-
-    for (int i = 0; i < data.size(); ++i) {
-        QJsonObject fileObject = data.at(i).toObject();
-        if (fileObject.isEmpty() || !fileObject.value("mime_type").toString().startsWith("image")) {
-            continue;
-        }
-
-        bool thumbExists = fileObject.value("thumb_exists").toBool();
-        QString thumbnailAPIUrl = content() + "/1/thumbnails/auto";
-        QString fileAPIUrl = content() + "/1/files/auto";
-        QString photoId = fileObject.value(QLatin1String("rev")).toString(); // does changing hash cause issues?
-        QString thumbnailUrl = fileObject.value("thumb_exists").toBool() ? thumbnailAPIUrl + fileObject.value(QLatin1String("path")).toString() : "";
-        QString imageSrcUrl = fileAPIUrl + fileObject.value(QLatin1String("path")).toString();
-        QString createdTimeStr = fileObject.value(QLatin1String("client_mtime")).toString();
-        QString updatedTimeStr = fileObject.value(QLatin1String("modified")).toString();
-        QString photoName = fileObject.value(QLatin1String("path")).toString().split("/").last();
-        int imageWidth = 0;
-        int imageHeight = 0;
-
-        // Find optimal thumbnail and image source urls based on dimensions.
-        QList<ImageSource> imageSources;
-        // https://content.dropboxapi.com/1/thumbnails/auto/
-        // xs	32x32 s	64x64 m	128x128 l 640x480 xl 1024x768
-
-        imageSources << ImageSource(static_cast<int>(32), static_cast<int>(32),
-                                   thumbnailAPIUrl + fileObject.value(QLatin1String("path")).toString()+"?size=xs");
-        imageSources << ImageSource(static_cast<int>(64), static_cast<int>(64),
-                                   thumbnailAPIUrl + fileObject.value(QLatin1String("path")).toString()+"?size=s");
-        imageSources << ImageSource(static_cast<int>(128), static_cast<int>(128),
-                                   thumbnailAPIUrl + fileObject.value(QLatin1String("path")).toString()+"?size=m");
-        imageSources << ImageSource(static_cast<int>(640), static_cast<int>(480),
-                                   thumbnailAPIUrl + fileObject.value(QLatin1String("path")).toString()+"?size=l");
-        imageSources << ImageSource(static_cast<int>(1024), static_cast<int>(768),
-                                   thumbnailAPIUrl + fileObject.value(QLatin1String("path")).toString()+"?size=xl");
-        // Dropbox does not have API to query original picture size, so we just lie it to be the best
-        imageSources << ImageSource(static_cast<int>(1024), static_cast<int>(800),
-                                   fileAPIUrl + fileObject.value(QLatin1String("path")).toString());
-
-        bool foundOptimalImage = false, foundOptimalThumbnail = false;
-        std::sort(imageSources.begin(), imageSources.end());
-        Q_FOREACH (const ImageSource &img, imageSources) {
-            if (thumbExists && !foundOptimalThumbnail && qMin(img.width, img.height) >= m_optimalThumbnailWidth) {
-                foundOptimalThumbnail = true;
-                thumbnailUrl = img.sourceUrl;
-            }
-            if (!foundOptimalImage && qMin(img.width, img.height) >= m_optimalImageWidth) {
-                foundOptimalImage = true;
-                imageWidth = img.width;
-                imageHeight = img.height;
-                imageSrcUrl = img.sourceUrl;
-            }
-        }
-        if (!foundOptimalThumbnail) {
-            // just choose the largest one.
-            thumbnailUrl = imageSources.last().sourceUrl;
-        }
-        if (!foundOptimalImage) {
-            // just choose the largest one. (size values are false)
-            imageSrcUrl = imageSources.last().sourceUrl;
-            imageWidth = imageSources.last().width;
-            imageHeight = imageSources.last().height;
-        }
-
-        QDateTime createdTime = QDateTime::fromString(createdTimeStr, Qt::ISODate);
-        QDateTime updatedTime = QDateTime::fromString(updatedTimeStr, Qt::ISODate);
-        if (!m_serverImageIds[albumId].contains(photoId)) {
-            m_serverImageIds[albumId].insert(photoId);
-        }
-
-        // check if we need to sync, and write to the database.
-        if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
-            SOCIALD_LOG_DEBUG("have previously cached photo" << photoId << ":" << imageSrcUrl);
-        } else {
-            SOCIALD_LOG_DEBUG("caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight);
-            m_db.addImage(photoId, albumId, userId, createdTime, updatedTime,
-                          photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl, accessToken);
-        }
-    }
-    checkRemovedImages(albumId);
-    // Finally, reduce our semaphore.
     decrementSemaphore(accountId);
 }
 
@@ -331,16 +419,17 @@ void DropboxImageSyncAdaptor::possiblyAddNewUser(const QString &userId, int acco
     }
 
     // We need to add the user. We call Dropbox to get the informations that we
-    // need and then add it to the database https://api.dropboxapi.com/1/account/info
+    // need and then add it to the database https://api.dropboxapi.com/2/users/get_current_account
 
-    QUrl url(QStringLiteral("%1/1/account/info").arg(api()));
+    QUrl url(QStringLiteral("%1/2/users/get_current_account").arg(api()));
     QNetworkRequest req;
     req.setUrl(url);
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                      QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+
     SOCIALD_LOG_DEBUG("querying Dropbox account info:" << url.toString());
 
-    QNetworkReply *reply = m_networkAccessManager->get(req);
+    QNetworkReply *reply = m_networkAccessManager->post(req, QByteArray());
     if (reply) {
         reply->setProperty("accountId", accountId);
         reply->setProperty("accessToken", accessToken);
@@ -365,15 +454,20 @@ void DropboxImageSyncAdaptor::userFinishedHandler()
 
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
-    if (!ok || !parsed.contains(QLatin1String("display_name"))) {
+    if (!ok || !parsed.contains(QLatin1String("name"))) {
         SOCIALD_LOG_ERROR("unable to read user response for Dropbox account with id" << accountId);
         return;
     }
 
     // QString userId = parsed.value(QLatin1String("id")).toString();
-    QString name = parsed.value(QLatin1String("display_name")).toString();
+    QJsonObject name = parsed.value(QLatin1String("name")).toObject();
+    QString display_name = name.value(QLatin1String("display_name")).toString();
+    if (display_name.isEmpty()) {
+        SOCIALD_LOG_ERROR("unable to read user display name for Dropbox account with id" << accountId);
+        return;
+    }
 
-    m_db.addUser(QString::number(accountId), QDateTime::currentDateTime(), name);
+    m_db.addUser(QString::number(accountId), QDateTime::currentDateTime(), display_name);
     decrementSemaphore(accountId);
 }
 
