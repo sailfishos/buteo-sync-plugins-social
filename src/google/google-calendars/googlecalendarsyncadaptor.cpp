@@ -654,67 +654,83 @@ void extractRecurrence(const QJsonArray &recurrence, KCalCore::Event::Ptr event,
     }
 }
 
-void extractOrganizer(const QJsonObject &creatorObj, const QJsonObject &organizerObj, KCalCore::Event::Ptr event)
+void extractOrganizer(const QJsonObject &creatorObj, const QJsonObject &organizerObj, KCalCore::Event::Ptr event, const GoogleCalendarSyncAdaptor::CalendarInfo &calendarInfo)
 {
     if (!organizerObj.value(QLatin1String("displayName")).toVariant().toString().isEmpty()
-                    || !organizerObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
+            || !organizerObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
+        const QString organizerEmail = organizerObj.value(QLatin1String("email")).toVariant().toString();
+        if (organizerEmail != calendarInfo.calendarId || calendarInfo.access != GoogleCalendarSyncAdaptor::Owner) {
             KCalCore::Person::Ptr organizer(new KCalCore::Person(
                     organizerObj.value(QLatin1String("displayName")).toVariant().toString(),
-                    organizerObj.value(QLatin1String("email")).toVariant().toString()));
+                    organizerEmail));
             event->setOrganizer(organizer);
-    } else if (!creatorObj.value(QLatin1String("displayName")).toVariant().toString().isEmpty()
-                || !creatorObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
-        KCalCore::Person::Ptr organizer(new KCalCore::Person(
-                creatorObj.value(QLatin1String("displayName")).toVariant().toString(),
-                creatorObj.value(QLatin1String("email")).toVariant().toString()));
-        event->setOrganizer(organizer);
-    } else {
-        KCalCore::Person::Ptr organizer(new KCalCore::Person);
-        event->setOrganizer(organizer);
+            return;
+        }
     }
+
+    if (!creatorObj.value(QLatin1String("displayName")).toVariant().toString().isEmpty()
+            || !creatorObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
+        const QString creatorEmail = creatorObj.value(QLatin1String("email")).toVariant().toString();
+        if (creatorEmail != calendarInfo.calendarId || calendarInfo.access != GoogleCalendarSyncAdaptor::Owner) {
+            KCalCore::Person::Ptr organizer(new KCalCore::Person(
+                    creatorObj.value(QLatin1String("displayName")).toVariant().toString(),
+                    creatorEmail));
+            event->setOrganizer(organizer);
+            return;
+        }
+    }
+
+    KCalCore::Person::Ptr organizer(new KCalCore::Person);
+    event->setOrganizer(organizer);
 }
 
-void extractAttendees(const QJsonArray &attendees, KCalCore::Event::Ptr event)
+void extractAttendees(const QJsonArray &attendees, KCalCore::Event::Ptr event, const GoogleCalendarSyncAdaptor::CalendarInfo &calendarInfo)
 {
     event->clearAttendees();
     for (int i = 0; i < attendees.size(); ++i) {
         QJsonObject attendeeObj = attendees.at(i).toObject();
         if (!attendeeObj.value(QLatin1String("organizer")).toVariant().toBool()) {
-            KCalCore::Attendee::Ptr attendee(new KCalCore::Attendee(
-                    attendeeObj.value(QLatin1String("displayName")).toVariant().toString(),
-                    attendeeObj.value(QLatin1String("email")).toVariant().toString()));
-            if (attendeeObj.find(QLatin1String("optional")) != attendeeObj.end()) {
-                if (attendeeObj.value(QLatin1String("optional")).toVariant().toBool()) {
-                    attendee->setRole(KCalCore::Attendee::OptParticipant);
-                } else {
-                    attendee->setRole(KCalCore::Attendee::ReqParticipant);
+            const QString attendeeEmail = attendeeObj.value(QLatin1String("email")).toVariant().toString();
+            if (attendeeEmail != calendarInfo.calendarId || calendarInfo.access != GoogleCalendarSyncAdaptor::Owner) {
+                KCalCore::Attendee::Ptr attendee(new KCalCore::Attendee(
+                        attendeeObj.value(QLatin1String("displayName")).toVariant().toString(),
+                        attendeeObj.value(QLatin1String("email")).toVariant().toString()));
+                if (attendeeObj.find(QLatin1String("optional")) != attendeeObj.end()) {
+                    if (attendeeObj.value(QLatin1String("optional")).toVariant().toBool()) {
+                        attendee->setRole(KCalCore::Attendee::OptParticipant);
+                    } else {
+                        attendee->setRole(KCalCore::Attendee::ReqParticipant);
+                    }
                 }
-            }
-            if (attendeeObj.find(QLatin1String("responseStatus")) != attendeeObj.end()) {
-                const QString &responseValue = attendeeObj.value(QLatin1String("responseStatus")).toVariant().toString();
-                if (responseValue == "needsAction") {
-                    attendee->setStatus(KCalCore::Attendee::NeedsAction);
-                } else if (responseValue == "accepted") {
-                    attendee->setStatus(KCalCore::Attendee::Accepted);
-                } else if (responseValue == "declined") {
-                    attendee->setStatus(KCalCore::Attendee::Declined);
-                } else {
-                    attendee->setStatus(KCalCore::Attendee::Tentative);
+                if (attendeeObj.find(QLatin1String("responseStatus")) != attendeeObj.end()) {
+                    const QString &responseValue = attendeeObj.value(QLatin1String("responseStatus")).toVariant().toString();
+                    if (responseValue == "needsAction") {
+                        attendee->setStatus(KCalCore::Attendee::NeedsAction);
+                    } else if (responseValue == "accepted") {
+                        attendee->setStatus(KCalCore::Attendee::Accepted);
+                    } else if (responseValue == "declined") {
+                        attendee->setStatus(KCalCore::Attendee::Declined);
+                    } else {
+                        attendee->setStatus(KCalCore::Attendee::Tentative);
+                    }
                 }
+                attendee->setRSVP(true);
+                event->addAttendee(attendee);
             }
-            attendee->setRSVP(true);
-            event->addAttendee(attendee);
         } else {
             KCalCore::Person::Ptr calOrganizer = event->organizer();
             if (!calOrganizer.isNull() && !calOrganizer->isEmpty()) {
                 continue;
             }
             if (!attendeeObj.value(QLatin1String("displayName")).toVariant().toString().isEmpty()
-                        || !attendeeObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
-                KCalCore::Person::Ptr organizer(new KCalCore::Person(
-                        attendeeObj.value(QLatin1String("displayName")).toVariant().toString(),
-                        attendeeObj.value(QLatin1String("email")).toVariant().toString()));
-                event->setOrganizer(organizer);
+                    || !attendeeObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
+                const QString attendeeEmail = attendeeObj.value(QLatin1String("email")).toVariant().toString();
+                if (attendeeEmail != calendarInfo.calendarId || calendarInfo.access != GoogleCalendarSyncAdaptor::Owner) {
+                    KCalCore::Person::Ptr organizer(new KCalCore::Person(
+                            attendeeObj.value(QLatin1String("displayName")).toVariant().toString(),
+                            attendeeEmail));
+                    event->setOrganizer(organizer);
+                }
             }
         }
     }
@@ -815,7 +831,7 @@ void extractAlarms(const QJsonObject &json, KCalCore::Event::Ptr event, int defa
     }
 }
 
-void jsonToKCal(const QJsonObject &json, KCalCore::Event::Ptr event, int defaultReminderStartOffset, KCalCore::ICalFormat &icalFormat, bool *changed)
+void jsonToKCal(const QJsonObject &json, KCalCore::Event::Ptr event, const GoogleCalendarSyncAdaptor::CalendarInfo &calendarInfo, int defaultReminderStartOffset, KCalCore::ICalFormat &icalFormat, bool *changed)
 {
     bool alreadyStarted = *changed; // if this is true, we don't need to call startUpdates/endUpdates() in this function.
     if (!alreadyStarted && gCalETag(event) == json.value(QLatin1String("etag")).toVariant().toString()) {
@@ -839,8 +855,8 @@ void jsonToKCal(const QJsonObject &json, KCalCore::Event::Ptr event, int default
     }
     setRemoteUidCustomField(event, json.value(QLatin1String("iCalUID")).toVariant().toString(), json.value(QLatin1String("id")).toVariant().toString());
     extractRecurrence(json.value(QLatin1String("recurrence")).toArray(), event, icalFormat);
-    extractOrganizer(json.value(QLatin1String("creator")).toObject(), json.value(QLatin1String("organizer")).toObject(), event);
-    extractAttendees(json.value(QLatin1String("attendees")).toArray(), event);
+    extractOrganizer(json.value(QLatin1String("creator")).toObject(), json.value(QLatin1String("organizer")).toObject(), event, calendarInfo);
+    extractAttendees(json.value(QLatin1String("attendees")).toArray(), event, calendarInfo);
     UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, isReadOnly, setReadOnly, json.value(QLatin1String("locked")).toVariant().toBool(), changed)
     UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, summary, setSummary, json.value(QLatin1String("summary")).toVariant().toString(), changed)
     UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, description, setDescription, json.value(QLatin1String("description")).toVariant().toString(), changed)
@@ -876,13 +892,13 @@ bool remoteModificationIsReal(const QJsonObject &json, KCalCore::Event::Ptr even
     return false; // this event has not changed server-side since we last saw it.
 }
 
-bool localModificationIsReal(const QJsonObject &local, const QJsonObject &remote, int defaultReminderStartOffset, KCalCore::ICalFormat &icalFormat)
+bool localModificationIsReal(const QJsonObject &local, const QJsonObject &remote, const GoogleCalendarSyncAdaptor::CalendarInfo &calendarInfo, int defaultReminderStartOffset, KCalCore::ICalFormat &icalFormat)
 {
     bool changed = true;
     KCalCore::Event::Ptr localEvent = KCalCore::Event::Ptr(new KCalCore::Event);
     KCalCore::Event::Ptr remoteEvent = KCalCore::Event::Ptr(new KCalCore::Event);
-    jsonToKCal(local, localEvent, defaultReminderStartOffset, icalFormat, &changed);
-    jsonToKCal(remote, remoteEvent, defaultReminderStartOffset, icalFormat, &changed);
+    jsonToKCal(local, localEvent, calendarInfo, defaultReminderStartOffset, icalFormat, &changed);
+    jsonToKCal(remote, remoteEvent, calendarInfo, defaultReminderStartOffset, icalFormat, &changed);
     if (GoogleCalendarIncidenceComparator::incidencesEqual(localEvent, remoteEvent, true)) {
         return false; // they're equal, so the local modification is not real.
     }
@@ -1210,6 +1226,7 @@ void GoogleCalendarSyncAdaptor::calendarsFinishedHandler()
                 QString accessRole = currCalendar.value(QStringLiteral("accessRole")).toString();
                 if (accessRole == QStringLiteral("owner") || accessRole == QStringLiteral("writer")) {
                     GoogleCalendarSyncAdaptor::CalendarInfo currCalendarInfo;
+                    currCalendarInfo.calendarId = currCalendar.value(QStringLiteral("id")).toString();
                     currCalendarInfo.color = currCalendar.value(QStringLiteral("backgroundColor")).toString();
                     currCalendarInfo.summary = currCalendar.value(QStringLiteral("summary")).toString();
                     currCalendarInfo.description = currCalendar.value(QStringLiteral("description")).toString();
@@ -1219,8 +1236,7 @@ void GoogleCalendarSyncAdaptor::calendarsFinishedHandler()
                     } else {
                         currCalendarInfo.access = Writer;
                     }
-                    QString currCalendarId = currCalendar.value(QStringLiteral("id")).toString();
-                    m_serverCalendarIdToCalendarInfo[accountId].insert(currCalendarId, currCalendarInfo);
+                    m_serverCalendarIdToCalendarInfo[accountId].insert(currCalendarInfo.calendarId, currCalendarInfo);
                 }
             }
         }
@@ -1850,7 +1866,10 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             if (event) {
                 QJsonObject localEventData = kCalToJson(event, m_icalFormat);
                 if (unchangedRemoteModifications.contains(updatedGcalId)
-                        && !localModificationIsReal(localEventData, unchangedRemoteModifications.value(updatedGcalId), m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat)) {
+                        && !localModificationIsReal(localEventData, unchangedRemoteModifications.value(updatedGcalId),
+                                                    m_serverCalendarIdToCalendarInfo[accountId].value(calendarId),
+                                                    m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId),
+                                                    m_icalFormat)) {
                     // this local modification is spurious.  It may have been reported
                     // due to the timestamp resolution issue, but in any case the
                     // event does not differ from the remote one.
@@ -1909,7 +1928,10 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                     // being reported as a local addition/modification due to the "since" timestamp
                     // overlap.
                     if (unchangedRemoteModifications.contains(gcalId)
-                            && !localModificationIsReal(localEventData, unchangedRemoteModifications.value(gcalId), m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat)) {
+                            && !localModificationIsReal(localEventData, unchangedRemoteModifications.value(gcalId),
+                                                        m_serverCalendarIdToCalendarInfo[accountId].value(calendarId),
+                                                        m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId),
+                                                        m_icalFormat)) {
                         // this local addition is spurious.  It may have been reported
                         // due to the timestamp resolution issue, but in any case the
                         // event does not differ from the remote one which is already updated.
@@ -2303,7 +2325,8 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(int accountId,
                     SOCIALD_LOG_DEBUG("Event modified remotely:" << eventId);
                     KCalCore::Event::Ptr event = allLocalEventsMap.value(eventId);
                     bool changed = false; // modification, not insert, so initially changed = "false".
-                    jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat, &changed);
+                    jsonToKCal(eventData, event, m_serverCalendarIdToCalendarInfo[accountId].value(calendarId),
+                               m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat, &changed);
                 } break;
                 case GoogleCalendarSyncAdaptor::Insert: {
                     // add a new local event for the remote addition.
@@ -2345,7 +2368,8 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(int accountId,
                         }
                     }
                     bool changed = true; // set to true as it's an addition, no need to check for delta.
-                    jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat, &changed); // direct conversion
+                    jsonToKCal(eventData, event, m_serverCalendarIdToCalendarInfo[accountId].value(calendarId),
+                               m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat, &changed); // direct conversion
                     if (!m_calendar->addEvent(event, googleNotebook->uid())) {
                         SOCIALD_LOG_ERROR("Could not add dissociated occurrence to calendar:" << parentId << recurrenceId.toString());
                         m_syncSucceeded[accountId] = false;
@@ -2365,7 +2389,8 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(int accountId,
         const QJsonObject eventData(remoteChange.second);
         // all changes are modifications to existing events, since it was an upsync response.
         bool changed = false;
-        jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat, &changed);
+        jsonToKCal(eventData, event, m_serverCalendarIdToCalendarInfo[accountId].value(calendarId),
+                   m_serverCalendarIdToDefaultReminderTimes[accountId].value(calendarId), m_icalFormat, &changed);
         if (changed) {
             SOCIALD_LOG_DEBUG("Two-way calendar sync with account" << accountId << ": re-updating event:" << event->summary());
             m_storageNeedsSave = true;

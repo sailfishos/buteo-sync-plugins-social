@@ -45,12 +45,6 @@ public:
     QString syncServiceName() const;
     void sync(const QString &dataTypeString, int accountId);
 
-protected: // implementing GoogleDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalCleanup();
-
-private:
     enum ChangeType {
         NoChange = 0,
         Insert = 1,
@@ -68,6 +62,22 @@ private:
         Owner = 4
     };
 
+    struct CalendarInfo {
+        CalendarInfo() : change(NoChange), access(NoAccess) {}
+        QString calendarId;
+        QString summary;
+        QString description;
+        QString color;
+        ChangeType change;
+        AccessRole access;
+    };
+
+protected: // implementing GoogleDataTypeSyncAdaptor interface
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
+    void beginSync(int accountId, const QString &accessToken);
+    void finalCleanup();
+
+private:
     struct UpsyncChange {
         UpsyncChange() : accountId(0), upsyncType(NoChange) {}
         int accountId;
@@ -105,14 +115,6 @@ private Q_SLOTS:
     void upsyncFinishedHandler();
 
 private:
-    struct CalendarInfo {
-        CalendarInfo() : change(NoChange), access(NoAccess) {}
-        QString summary;
-        QString description;
-        QString color;
-        ChangeType change;
-        AccessRole access;
-    };
     QMap<int, QMap<QString, CalendarInfo> > m_serverCalendarIdToCalendarInfo;
     QMap<int, QMap<QString, int> > m_serverCalendarIdToDefaultReminderTimes;
     QMap<int, QMultiMap<QString, QJsonObject> > m_calendarIdToEventObjects;
