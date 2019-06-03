@@ -2122,6 +2122,7 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally(int accountId)
                 notebook->setColor(m_serverCalendarIdToCalendarInfo[accountId].value(serverCalendarId).color);
                 notebook->setDescription(m_serverCalendarIdToCalendarInfo[accountId].value(serverCalendarId).description);
                 notebook->setPluginName(QStringLiteral("google-") + serverCalendarId);
+                notebook->setSharedWith(QStringList() << serverCalendarId);
                 notebook->setAccount(QString::number(accountId));
                 m_storage->addNotebook(notebook);
                 m_storageNeedsSave = true;
