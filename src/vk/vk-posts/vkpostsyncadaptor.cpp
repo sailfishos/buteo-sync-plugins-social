@@ -484,7 +484,7 @@ QDateTime VKPostSyncAdaptor::lastSuccessfulSyncTime(int accountId)
 {
     QDateTime result;
     QString settingsFileName = QString::fromLatin1("%1/%2/vkposts.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     uint timestamp = settingsFile.value(QString::fromLatin1("%1-last-successful-sync-time").arg(accountId)).toUInt();
@@ -498,7 +498,7 @@ void VKPostSyncAdaptor::setLastSuccessfulSyncTime(int accountId)
 {
     QDateTime currentTime = QDateTime::currentDateTime().toUTC();
     QString settingsFileName = QString::fromLatin1("%1/%2/vkposts.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     settingsFile.setValue(QString::fromLatin1("%1-last-successful-sync-time").arg(accountId),

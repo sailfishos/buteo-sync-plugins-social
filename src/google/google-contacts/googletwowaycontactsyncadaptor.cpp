@@ -92,7 +92,7 @@ void GoogleTwoWayContactSyncAdaptor::sync(const QString &dataTypeString, int acc
 {
     // check if we need to perform a complete clean sync
     QString settingsFileName = QString::fromLatin1("%1/%2/gcontacts.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     bool doneCleanSync = settingsFile.value(QString::fromLatin1("%1-cleansync").arg(accountId), QVariant::fromValue<bool>(false)).toBool();

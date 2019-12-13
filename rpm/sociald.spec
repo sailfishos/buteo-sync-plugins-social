@@ -20,6 +20,7 @@ BuildRequires:  qt5-qttools-linguist
 BuildRequires:  ssu-devel
 Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
+Requires(pre):  sailfish-setup
 Requires(post): systemd
 Obsoletes: sociald-facebook-notifications
 
@@ -54,8 +55,12 @@ Provides calendar synchronisation with Facebook
 %config %{_sysconfdir}/buteo/profiles/sync/facebook.Calendars.xml
 
 %pre facebook-calendars
-rm -f /home/nemo/.cache/msyncd/sync/client/facebook-calendars.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/facebook.Calendars.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/facebook-calendars.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/facebook.Calendars.xml || :
+done
 
 %post facebook-calendars
 systemctl-user try-restart msyncd.service || :
@@ -80,8 +85,12 @@ Provides contact synchronisation with Facebook
 %config %{_sysconfdir}/buteo/profiles/sync/facebook.Contacts.xml
 
 %pre facebook-contacts
-rm -f /home/nemo/.cache/msyncd/sync/client/facebook-contacts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/facebook.Contacts.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/facebook-contacts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/facebook.Contacts.xml || :
+done
 
 %post facebook-contacts
 systemctl-user try-restart msyncd.service || :
@@ -103,8 +112,12 @@ Provides image synchronisation with Facebook
 %config %{_sysconfdir}/buteo/profiles/sync/facebook.Images.xml
 
 %pre facebook-images
-rm -f /home/nemo/.cache/msyncd/sync/client/facebook-images.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/facebook.Images.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/facebook-images.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/facebook.Images.xml || :
+done
 
 %post facebook-images
 systemctl-user try-restart msyncd.service || :
@@ -127,8 +140,12 @@ Provides signon credentials refreshing with Facebook
 %config %{_sysconfdir}/buteo/profiles/sync/facebook.Signon.xml
 
 %pre facebook-signon
-rm -f /home/nemo/.cache/msyncd/sync/client/facebook-signon.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/facebook.Signon.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/facebook-signon.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/facebook.Signon.xml || :
+done
 
 %post facebook-signon
 systemctl-user try-restart msyncd.service || :
@@ -153,8 +170,12 @@ Provides calendar synchronisation with Google
 %config %{_sysconfdir}/buteo/profiles/sync/google.Calendars.xml
 
 %pre google-calendars
-rm -f /home/nemo/.cache/msyncd/sync/client/google-calendars.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/google.Calendars.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/google-calendars.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/google.Calendars.xml || :
+done
 
 %post google-calendars
 systemctl-user try-restart msyncd.service || :
@@ -179,8 +200,12 @@ Provides contact synchronisation with Google
 %config %{_sysconfdir}/buteo/profiles/sync/google.Contacts.xml
 
 %pre google-contacts
-rm -f /home/nemo/.cache/msyncd/sync/client/google-contacts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/google.Contacts.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/google-contacts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/google.Contacts.xml || :
+done
 
 %post google-contacts
 systemctl-user try-restart msyncd.service || :
@@ -203,8 +228,12 @@ Provides signon credentials refreshing with Google
 %config %{_sysconfdir}/buteo/profiles/sync/google.Signon.xml
 
 %pre google-signon
-rm -f /home/nemo/.cache/msyncd/sync/client/google-signon.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/google.Signon.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/google-signon.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/google.Signon.xml || :
+done
 
 %post google-signon
 systemctl-user try-restart msyncd.service || :
@@ -235,8 +264,12 @@ Provides notification synchronisation with Twitter
 %{_datadir}/translations/lipstick-jolla-home-twitter-notif_eng_en.qm
 
 %pre twitter-notifications
-rm -f /home/nemo/.cache/msyncd/sync/client/twitter-notifications.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/twitter.Notifications.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/twitter-notifications.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/twitter.Notifications.xml || :
+done
 
 %post twitter-notifications
 systemctl-user try-restart msyncd.service || :
@@ -262,8 +295,12 @@ Provides post synchronisation with Twitter
 %{_datadir}/lipstick/notificationcategories/x-nemo.social.twitter.tweet.conf
 
 %pre twitter-posts
-rm -f /home/nemo/.cache/msyncd/sync/client/twitter-posts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/twitter.Posts.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/twitter-posts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/twitter.Posts.xml || :
+done
 
 %post twitter-posts
 systemctl-user try-restart msyncd.service || :
@@ -286,8 +323,12 @@ Provides signon credentials refreshing with OneDrive
 %config %{_sysconfdir}/buteo/profiles/sync/onedrive.Signon.xml
 
 %pre onedrive-signon
-rm -f /home/nemo/.cache/msyncd/sync/client/onedrive-signon.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/onedrive.Signon.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/onedrive-signon.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.Signon.xml || :
+done
 
 %post onedrive-signon
 systemctl-user try-restart msyncd.service || :
@@ -314,8 +355,12 @@ Provides post synchronisation with VK
 %config %{_sysconfdir}/buteo/profiles/sync/vk.Posts.xml
 
 %pre vk-posts
-rm -f /home/nemo/.cache/msyncd/sync/client/vk-posts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/vk.Posts.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/vk-posts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/vk.Posts.xml || :
+done
 
 %post vk-posts
 systemctl-user restart msyncd.service || :
@@ -336,8 +381,12 @@ Provides image synchronisation with Dropbox
 %config %{_sysconfdir}/buteo/profiles/sync/dropbox.Images.xml
 
 %pre dropbox-images
-rm -f /home/nemo/.cache/msyncd/sync/client/dropbox-images.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/dropbox.Images.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/dropbox-images.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/dropbox.Images.xml || :
+done
 
 %post dropbox-images
 systemctl-user try-restart msyncd.service || :
@@ -358,8 +407,12 @@ Provides image synchronisation with OneDrive
 %config %{_sysconfdir}/buteo/profiles/sync/onedrive.Images.xml
 
 %pre onedrive-images
-rm -f /home/nemo/.cache/msyncd/sync/client/onedrive-images.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/onedrive.Images.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/onedrive-images.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.Images.xml || :
+done
 
 %post onedrive-images
 systemctl-user try-restart msyncd.service || :
@@ -383,8 +436,12 @@ Provides backup-blob synchronization for OneDrive
 %config %{_sysconfdir}/buteo/profiles/sync/onedrive.Backup.xml
 
 %pre onedrive-backup
-rm -f /home/nemo/.cache/msyncd/sync/client/onedrive-backup.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/onedrive.Backup.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/onedrive-backup.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.Backup.xml || :
+done
 
 %post onedrive-backup
 systemctl-user try-restart msyncd.service || :
@@ -408,8 +465,12 @@ Provides backup-blob synchronization for Dropbox
 %config %{_sysconfdir}/buteo/profiles/sync/dropbox.Backup.xml
 
 %pre dropbox-backup
-rm -f /home/nemo/.cache/msyncd/sync/client/dropbox-backup.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/dropbox.Backup.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/dropbox-backup.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/dropbox.Backup.xml || :
+done
 
 %post dropbox-backup
 systemctl-user try-restart msyncd.service || :
@@ -435,8 +496,12 @@ Provides notification synchronisation with VK
 %{_datadir}/lipstick/notificationcategories/x-nemo.social.vk.notification.conf
 
 %pre vk-notifications
-rm -f /home/nemo/.cache/msyncd/sync/client/vk-notifications.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/vk.Notifications.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/vk-notifications.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/vk.Notifications.xml || :
+done
 
 %post vk-notifications
 systemctl-user restart msyncd.service || :
@@ -460,8 +525,12 @@ Provides calendar synchronisation with VK
 %config %{_sysconfdir}/buteo/profiles/sync/vk.Calendars.xml
 
 %pre vk-calendars
-rm -f /home/nemo/.cache/msyncd/sync/client/vk-calendars.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/vk.Calendars.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/vk-calendars.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/vk.Calendars.xml || :
+done
 
 %post vk-calendars
 systemctl-user restart msyncd.service || :
@@ -486,8 +555,12 @@ Provides contact synchronisation with VK
 %config %{_sysconfdir}/buteo/profiles/sync/vk.Contacts.xml
 
 %pre vk-contacts
-rm -f /home/nemo/.cache/msyncd/sync/client/vk-contacts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/vk.Contacts.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/vk-contacts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/vk.Contacts.xml || :
+done
 
 %post vk-contacts
 systemctl-user restart msyncd.service || :
@@ -509,8 +582,12 @@ Provides image synchronisation with VK
 %config %{_sysconfdir}/buteo/profiles/sync/vk.Images.xml
 
 %pre vk-images
-rm -f /home/nemo/.cache/msyncd/sync/client/vk-images.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/vk.Images.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/vk-images.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/vk.Images.xml || :
+done
 
 %post vk-images
 systemctl-user restart msyncd.service || :
@@ -550,15 +627,19 @@ Automatable tests for sociald
 make %{_smp_mflags}
 
 %pre
-rm -f /home/nemo/.cache/msyncd/sync/client/sociald.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.facebook.Calendars.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.facebook.Contacts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.facebook.Images.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.facebook.Notifications.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.twitter.Notifications.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.twitter.Posts.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.google.Calendars.xml || :
-rm -f /home/nemo/.cache/msyncd/sync/sociald.google.Contacts.xml || :
+USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
+for user in $USERS; do
+    USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/sociald.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.facebook.Calendars.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.facebook.Contacts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.facebook.Images.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.facebook.Notifications.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.twitter.Notifications.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.twitter.Posts.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.google.Calendars.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/sociald.google.Contacts.xml || :
+done
 
 %install
 rm -rf %{buildroot}

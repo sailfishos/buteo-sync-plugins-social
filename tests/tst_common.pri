@@ -1,5 +1,5 @@
 DEFINES += SOCIALD_TEST_DEFINE
-DEFINES += 'PRIVILEGED_DATA_DIR=\'\"/tmp/\"\''
+DEFINES += 'PRIVILEGED_DATA_DIR=\'\"/tmp\"\''
 
 DEFINES += SOCIALD_USE_QTPIM
 include($$PWD/../src/common.pri)

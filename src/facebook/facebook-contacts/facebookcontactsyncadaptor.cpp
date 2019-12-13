@@ -58,7 +58,7 @@
 #define SOCIALD_FACEBOOK_CONTACTS_ID_PREFIX QLatin1String("facebook-contacts-")
 #define SOCIALD_FACEBOOK_CONTACTS_GROUPNAME QLatin1String("sociald-sync-facebook-contacts")
 #define SOCIALD_FACEBOOK_CONTACTS_SYNCTARGET QLatin1String("facebook")
-#define SOCIALD_FACEBOOK_CONTACTS_AVATAR_FILENAME(fbFriendId, avatarType) QString("%1/%2/%3-%4.jpg").arg(QLatin1String(PRIVILEGED_DATA_DIR)).arg(SocialNetworkSyncAdaptor::dataTypeName(m_dataType)).arg(fbFriendId).arg(avatarType)
+#define SOCIALD_FACEBOOK_CONTACTS_AVATAR_FILENAME(fbFriendId, avatarType) QString("%1/%2/%3-%4.jpg").arg(PRIVILEGED_DATA_DIR).arg(SocialNetworkSyncAdaptor::dataTypeName(m_dataType)).arg(fbFriendId).arg(avatarType)
 #define SOCIALD_FACEBOOK_CONTACTS_AVATAR_BATCHSIZE 20
 
 static const char *WHICH_FIELDS = "name,first_name,middle_name,last_name,link,website,"\

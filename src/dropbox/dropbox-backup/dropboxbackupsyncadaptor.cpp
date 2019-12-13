@@ -92,7 +92,7 @@ void DropboxBackupSyncAdaptor::beginSync(int accountId, const QString &accessTok
     }
 
     if (backupRestoreOptions.localDirPath.isEmpty()) {
-        backupRestoreOptions.localDirPath = QString::fromLatin1("%1/Backups/").arg(QString::fromLatin1(PRIVILEGED_DATA_DIR));
+        backupRestoreOptions.localDirPath = QString::fromLatin1("%1/Backups/").arg(PRIVILEGED_DATA_DIR);
     }
     // create local directory if it doesn't exist
     QDir localDir;

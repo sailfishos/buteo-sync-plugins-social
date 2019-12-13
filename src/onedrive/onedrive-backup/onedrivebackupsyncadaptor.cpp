@@ -127,7 +127,7 @@ void OneDriveBackupSyncAdaptor::beginSync(int accountId, const QString &accessTo
     }
 
     if (backupRestoreOptions.localDirPath.isEmpty()) {
-        backupRestoreOptions.localDirPath = QString::fromLatin1("%1/Backups/").arg(QString::fromLatin1(PRIVILEGED_DATA_DIR));
+        backupRestoreOptions.localDirPath = QString::fromLatin1("%1/Backups/").arg(PRIVILEGED_DATA_DIR);
     }
     // create local directory if it doesn't exist
     QDir localDir;

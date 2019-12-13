@@ -38,7 +38,7 @@ namespace {
     bool touchTimestampFile()
     {
         static const QString timestampFileName = QString::fromLatin1("%1/%2/vktimestamp")
-                .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+                .arg(PRIVILEGED_DATA_DIR)
                 .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
         QByteArray tsfnba = timestampFileName.toUtf8();
 
@@ -59,7 +59,7 @@ namespace {
     qint64 readTimestampFile()
     {
         static const QString timestampFileName = QString::fromLatin1("%1/%2/vktimestamp")
-                .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+                .arg(PRIVILEGED_DATA_DIR)
                 .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
         QByteArray tsfnba = timestampFileName.toUtf8();
 

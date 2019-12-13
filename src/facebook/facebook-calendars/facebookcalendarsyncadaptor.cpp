@@ -62,7 +62,7 @@ namespace {
     bool ghostEventCleanupPerformed()
     {
         QString settingsFileName = QString::fromLatin1("%1/%2/fbcal.ini")
-                .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+                .arg(PRIVILEGED_DATA_DIR)
                 .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
         QSettings settingsFile(settingsFileName, QSettings::IniFormat);
         return settingsFile.value(QString::fromLatin1("cleaned"), QVariant::fromValue<bool>(false)).toBool();
@@ -71,7 +71,7 @@ namespace {
     void setGhostEventCleanupPerformed()
     {
         QString settingsFileName = QString::fromLatin1("%1/%2/fbcal.ini")
-                .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+                .arg(PRIVILEGED_DATA_DIR)
                 .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
         QSettings settingsFile(settingsFileName, QSettings::IniFormat);
         settingsFile.setValue(QString::fromLatin1("cleaned"), QVariant::fromValue<bool>(true));

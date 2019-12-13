@@ -37,4 +37,8 @@
 #include <PluginCbInterface.h>
 #include <LogMacros.h>
 
+#ifndef SOCIALD_TEST_DEFINE
+#define PRIVILEGED_DATA_DIR QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + QLatin1String("/.local/share/system/privileged")
+#endif
+
 #endif // SOCIALD_BUTEOSYNCFW_P_H

@@ -22,7 +22,6 @@ QMAKE_LFLAGS += $$QMAKE_LFLAGS_NOUNDEF
 HEADERS += $$PWD/common/socialdnetworkaccessmanager_p.h
 !contains(DEFINES, 'SOCIALD_TEST_DEFINE') {
     SOURCES += $$PWD/common/socialdnetworkaccessmanager_p.cpp
-    DEFINES += 'PRIVILEGED_DATA_DIR=\'\"/home/nemo/.local/share/system/privileged/\"\''
 }
 
 DEFINES += 'SYNC_DATABASE_DIR=\'\"Sync\"\''

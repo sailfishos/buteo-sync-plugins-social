@@ -90,7 +90,7 @@ void traceDumpStr(const QString &str)
 bool ghostEventCleanupPerformed()
 {
     QString settingsFileName = QString::fromLatin1("%1/%2/gcal.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     return settingsFile.value(QString::fromLatin1("cleaned"), QVariant::fromValue<bool>(false)).toBool();
@@ -98,7 +98,7 @@ bool ghostEventCleanupPerformed()
 void setGhostEventCleanupPerformed()
 {
     QString settingsFileName = QString::fromLatin1("%1/%2/gcal.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     settingsFile.setValue(QString::fromLatin1("cleaned"), QVariant::fromValue<bool>(true));
@@ -899,7 +899,7 @@ bool localModificationIsReal(const QJsonObject &local, const QJsonObject &remote
 bool wasLastSyncSuccessful(int accountId, bool *needCleanSync)
 {
     QString settingsFileName = QString::fromLatin1("%1/%2/gcal.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     if (!QFile::exists(settingsFileName)) {
         SOCIALD_LOG_DEBUG("gcal.ini settings file does not exist, triggering clean sync");
@@ -925,7 +925,7 @@ bool wasLastSyncSuccessful(int accountId, bool *needCleanSync)
 void setLastSyncSuccessful(QList<int> accountIds)
 {
     QString settingsFileName = QString::fromLatin1("%1/%2/gcal.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     Q_FOREACH(int accountId, accountIds) {
@@ -938,7 +938,7 @@ void setLastSyncSuccessful(QList<int> accountIds)
 void setLastSyncRequiresCleanSync(QList<int> accountIds)
 {
     QString settingsFileName = QString::fromLatin1("%1/%2/gcal.ini")
-            .arg(QString::fromLatin1(PRIVILEGED_DATA_DIR))
+            .arg(PRIVILEGED_DATA_DIR)
             .arg(QString::fromLatin1(SYNC_DATABASE_DIR));
     QSettings settingsFile(settingsFileName, QSettings::IniFormat);
     Q_FOREACH(int accountId, accountIds) {
