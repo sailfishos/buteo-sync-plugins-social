@@ -31,13 +31,6 @@ namespace Buteo {
 class BackupRestoreOptions
 {
 public:
-    enum Operation {
-        DirectoryListing,
-        Upload,
-        Download
-    };
-
-    Operation operation = DirectoryListing;
     QString localDirPath;
     QString remoteDirPath;
     QString fileName;

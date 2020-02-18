@@ -18,29 +18,29 @@
  **
  ****************************************************************************/
 
-#ifndef ONEDRIVEBACKUPPLUGIN_H
-#define ONEDRIVEBACKUPPLUGIN_H
+#ifndef ONEDRIVEBACKUPQUERYPLUGIN_H
+#define ONEDRIVEBACKUPQUERYPLUGIN_H
 
 #include "socialdbuteoplugin.h"
 
-class SOCIALDBUTEOPLUGIN_EXPORT OneDriveBackupPlugin : public SocialdButeoPlugin
+class SOCIALDBUTEOPLUGIN_EXPORT OneDriveBackupQueryPlugin : public SocialdButeoPlugin
 {
     Q_OBJECT
 
 public:
-    OneDriveBackupPlugin(const QString& pluginName,
+    OneDriveBackupQueryPlugin(const QString& pluginName,
                   const Buteo::SyncProfile& profile,
                   Buteo::PluginCbInterface *cbInterface);
-    ~OneDriveBackupPlugin();
+    ~OneDriveBackupQueryPlugin();
 
 protected:
     SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
 };
 
-extern "C" OneDriveBackupPlugin* createPlugin(const QString& pluginName,
+extern "C" OneDriveBackupQueryPlugin* createPlugin(const QString& pluginName,
                                               const Buteo::SyncProfile& profile,
                                               Buteo::PluginCbInterface *cbInterface);
 
-extern "C" void destroyPlugin(OneDriveBackupPlugin* client);
+extern "C" void destroyPlugin(OneDriveBackupQueryPlugin* client);
 
-#endif // ONEDRIVEBACKUPPLUGIN_H
+#endif // ONEDRIVEBACKUPQUERYPLUGIN_H
