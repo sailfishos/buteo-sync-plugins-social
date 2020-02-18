@@ -1,7 +1,6 @@
 /****************************************************************************
  **
- ** Copyright (C) 2015 Jolla Ltd.
- ** Contact: Chris Adams <chris.adams@jolla.com>
+ ** Copyright (c) 2020 Open Mobile Platform LLC.
  **
  ** This program/library is free software; you can redistribute it and/or
  ** modify it under the terms of the GNU Lesser General Public License

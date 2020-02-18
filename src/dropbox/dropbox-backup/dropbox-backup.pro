@@ -4,6 +4,7 @@ DEFINES += "CLASSNAME=DropboxBackupPlugin"
 DEFINES += CLASSNAME_H=\\\"dropboxbackupplugin.h\\\"
 include($$PWD/../../common.pri)
 include($$PWD/../dropbox-common.pri)
+include($$PWD/../dropbox-backupoperation.pri)
 include($$PWD/dropbox-backup.pri)
 
 dropbox_backup_sync_profile.path = /etc/buteo/profiles/sync

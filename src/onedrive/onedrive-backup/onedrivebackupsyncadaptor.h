@@ -1,7 +1,7 @@
 /****************************************************************************
  **
- ** Copyright (C) 2015-2019 Jolla Ltd.
- ** Copyright (C) 2019 Open Mobile Platform LLC
+ ** Copyright (c) 2015 - 2019 Jolla Ltd.
+ ** Copyright (c) 2020 Open Mobile Platform LLC.
  **
  ** This program/library is free software; you can redistribute it and/or
  ** modify it under the terms of the GNU Lesser General Public License
@@ -22,85 +22,17 @@
 #ifndef ONEDRIVEBACKUPSYNCADAPTOR_H
 #define ONEDRIVEBACKUPSYNCADAPTOR_H
 
-#include "onedrivedatatypesyncadaptor.h"
-#include "backuprestoreoptions_p.h"
+#include "onedrivebackupoperationsyncadaptor.h"
 
-#include <QtCore/QObject>
-#include <QtCore/QString>
-#include <QtCore/QDateTime>
-#include <QtCore/QVariantMap>
-#include <QtCore/QList>
-#include <QtCore/QStringList>
-#include <QtCore/QSet>
-#include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QSslError>
-#include <QtSql/QSqlDatabase>
-
-namespace Buteo {
-    class ProfileManager;
-}
-
-class OneDriveBackupSyncAdaptor : public OneDriveDataTypeSyncAdaptor
+class OneDriveBackupSyncAdaptor : public OneDriveBackupOperationSyncAdaptor
 {
     Q_OBJECT
 
 public:
-    OneDriveBackupSyncAdaptor(const QString &profileName, QObject *parent);
+    OneDriveBackupSyncAdaptor(QObject *parent);
     ~OneDriveBackupSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId);
-
-protected: // implementing OneDriveDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
-    void finalCleanup();
-
-private:
-    void initialiseAppFolderRequest(int accountId, const QString &accessToken,
-                                    const QString &localPath, const QString &remotePath,
-                                    const QString &remoteFile, const QString &syncDirection);
-    void getRemoteFolderMetadata(int accountId, const QString &accessToken,
-                                 const QString &localPath, const QString &remotePath,
-                                 const QString &parentId, const QString &remoteDirName);
-
-    void requestData(int accountId, const QString &accessToken,
-                     const QString &localPath, const QString &remotePath,
-                     const QString &remoteFile = QString(), const QString &redirectUrl = QString());
-    void uploadData(int accountId, const QString &accessToken,
-                    const QString &localPath, const QString &remotePath,
-                    const QString &localFile = QString());
-    void purgeAccount(int accountId);
-
-private Q_SLOTS:
-    void initialiseAppFolderFinishedHandler();
-    void getRemoteFolderMetadataFinishedHandler();
-    void remotePathFinishedHandler();
-    void remoteFileFinishedHandler();
-    void createRemotePathFinishedHandler();
-    void createRemoteFileFinishedHandler();
-    void downloadProgressHandler(qint64 bytesReceived, qint64 bytesTotal);
-    void uploadProgressHandler(qint64 bytesSent, qint64 bytesTotal);
-
-private:
-    void beginListOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options);
-    void beginSyncOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options);
-    void listOperationFinished();
-
-    Buteo::ProfileManager *m_profileManager;
-
-    QString m_profileName;
-    QString m_remoteAppDir;
-
-    struct RemoteDirectory {
-        QString dirName;
-        QString remoteId;
-        QString parentPath;
-        QString parentId;
-        bool created;
-    };
-    QList<RemoteDirectory> m_remoteDirectories;
+    OneDriveBackupOperationSyncAdaptor::Operation operation() const override;
 };
 
 #endif // ONEDRIVEBACKUPSYNCADAPTOR_H

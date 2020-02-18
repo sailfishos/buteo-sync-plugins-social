@@ -4,6 +4,7 @@ DEFINES += "CLASSNAME=OneDriveBackupPlugin"
 DEFINES += CLASSNAME_H=\\\"onedrivebackupplugin.h\\\"
 include($$PWD/../../common.pri)
 include($$PWD/../onedrive-common.pri)
+include($$PWD/../onedrive-backupoperation.pri)
 include($$PWD/onedrive-backup.pri)
 
 onedrive_backup_sync_profile.path = /etc/buteo/profiles/sync

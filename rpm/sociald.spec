@@ -431,17 +431,29 @@ Requires: %{name} = %{version}-%{release}
 %files onedrive-backup
 #out-of-process-plugin form:
 /usr/lib/buteo-plugins-qt5/oopp/onedrive-backup-client
+/usr/lib/buteo-plugins-qt5/oopp/onedrive-backupquery-client
+/usr/lib/buteo-plugins-qt5/oopp/onedrive-backuprestore-client
 #in-process-plugin form:
 #/usr/lib/buteo-plugins-qt5/libonedrive-backup-client.so
+#/usr/lib/buteo-plugins-qt5/libonedrive-backupquery-client.so
+#/usr/lib/buteo-plugins-qt5/libonedrive-backuprestore-client.so
 %config %{_sysconfdir}/buteo/profiles/client/onedrive-backup.xml
+%config %{_sysconfdir}/buteo/profiles/client/onedrive-backupquery.xml
+%config %{_sysconfdir}/buteo/profiles/client/onedrive-backuprestore.xml
 %config %{_sysconfdir}/buteo/profiles/sync/onedrive.Backup.xml
+%config %{_sysconfdir}/buteo/profiles/sync/onedrive.BackupQuery.xml
+%config %{_sysconfdir}/buteo/profiles/sync/onedrive.BackupRestore.xml
 
 %pre onedrive-backup
 USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
 for user in $USERS; do
     USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
     rm -f ${USERHOME}/.cache/msyncd/sync/client/onedrive-backup.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/onedrive-backupquery.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/onedrive-backuprestore.xml || :
     rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.Backup.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.BackupQuery.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.BackupRestore.xml || :
 done
 
 %post onedrive-backup
@@ -460,17 +472,29 @@ Requires: %{name} = %{version}-%{release}
 %files dropbox-backup
 #out-of-process-plugin form:
 /usr/lib/buteo-plugins-qt5/oopp/dropbox-backup-client
+/usr/lib/buteo-plugins-qt5/oopp/dropbox-backupquery-client
+/usr/lib/buteo-plugins-qt5/oopp/dropbox-backuprestore-client
 #in-process-plugin form:
 #/usr/lib/buteo-plugins-qt5/libdropbox-backup-client.so
+#/usr/lib/buteo-plugins-qt5/libdropbox-backupquery-client.so
+#/usr/lib/buteo-plugins-qt5/libdropbox-backuprestore-client.so
 %config %{_sysconfdir}/buteo/profiles/client/dropbox-backup.xml
+%config %{_sysconfdir}/buteo/profiles/client/dropbox-backupquery.xml
+%config %{_sysconfdir}/buteo/profiles/client/dropbox-backuprestore.xml
 %config %{_sysconfdir}/buteo/profiles/sync/dropbox.Backup.xml
+%config %{_sysconfdir}/buteo/profiles/sync/dropbox.BackupQuery.xml
+%config %{_sysconfdir}/buteo/profiles/sync/dropbox.BackupRestore.xml
 
 %pre dropbox-backup
 USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
 for user in $USERS; do
     USERHOME=$(getent passwd ${user} | cut -d ":" -f 6)
     rm -f ${USERHOME}/.cache/msyncd/sync/client/dropbox-backup.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/dropbox-backupquery.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/client/dropbox-backuprestore.xml || :
     rm -f ${USERHOME}/.cache/msyncd/sync/dropbox.Backup.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/dropbox.BackupQuery.xml || :
+    rm -f ${USERHOME}/.cache/msyncd/sync/dropbox.BackupRestore.xml || :
 done
 
 %post dropbox-backup

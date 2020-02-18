@@ -56,7 +56,10 @@ namespace {
                 << QStringLiteral("Posts")
                 << QStringLiteral("Messages")
                 << QStringLiteral("Emails")
-                << QStringLiteral("Signon");
+                << QStringLiteral("Signon")
+                << QStringLiteral("Backup")
+                << QStringLiteral("BackupQuery")
+                << QStringLiteral("BackupRestore");
     }
 }
 
@@ -425,6 +428,8 @@ QString SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::DataTyp
         case SocialNetworkSyncAdaptor::Emails:        return QStringLiteral("Emails");
         case SocialNetworkSyncAdaptor::Signon:        return QStringLiteral("Signon");
         case SocialNetworkSyncAdaptor::Backup:        return QStringLiteral("Backup");
+        case SocialNetworkSyncAdaptor::BackupQuery:   return QStringLiteral("BackupQuery");
+        case SocialNetworkSyncAdaptor::BackupRestore: return QStringLiteral("BackupRestore");
         default: break;
     }
 

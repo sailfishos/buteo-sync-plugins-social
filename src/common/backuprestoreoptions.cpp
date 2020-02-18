@@ -42,20 +42,6 @@ bool BackupRestoreOptions::copyToProfile(Buteo::SyncProfile *syncProfile)
         return false;
     }
 
-    QString operationValue;
-    switch (operation) {
-    case DirectoryListing:
-        operationValue = "dir-listing";
-        break;
-    case Upload:
-        operationValue = "upload";
-        break;
-    case Download:
-        operationValue = "download";
-        break;
-    };
-
-    clientProfile->setKey("sfos-operation", operationValue);
     clientProfile->setKey("sfos-dir-local", localDirPath);
     clientProfile->setKey("sfos-dir-remote", remoteDirPath);
     clientProfile->setKey("sfos-filename", fileName);
@@ -77,32 +63,13 @@ BackupRestoreOptions BackupRestoreOptions::fromProfile(Buteo::SyncProfile *syncP
     }
 
     BackupRestoreOptions options;
-    QString operation = clientProfile->key("sfos-operation");
     options.localDirPath = clientProfile->key("sfos-dir-local");
     options.remoteDirPath = clientProfile->key("sfos-dir-remote");
     options.fileName = clientProfile->key("sfos-filename");
 
-    if (operation == "dir-listing") {
-        options.operation = BackupRestoreOptions::DirectoryListing;
-    } else if (operation == "upload") {
-        options.operation = BackupRestoreOptions::Upload;
-    } else if (operation == "download") {
-        options.operation = BackupRestoreOptions::Download;
-    } else {
-        qWarning() << "Backup/restore options for sync profile" << syncProfile->name()
-                   << "has invalid operation type:" << operation;
-        return BackupRestoreOptions();
-    }
-
     if (options.localDirPath.isEmpty()) {
         qWarning() << "Backup/restore options for sync profile" << syncProfile->name()
                    << "do not specify a local directory!";
-        return BackupRestoreOptions();
-    }
-
-    if (options.operation == BackupRestoreOptions::DirectoryListing && options.fileName.isEmpty()) {
-        qWarning() << "Backup/restore options for sync profile" << syncProfile->name()
-                   << "do not specify a file name for directory listing!";
         return BackupRestoreOptions();
     }
 
