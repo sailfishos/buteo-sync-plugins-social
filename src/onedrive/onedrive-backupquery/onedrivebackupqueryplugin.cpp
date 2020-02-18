@@ -18,36 +18,36 @@
  **
  ****************************************************************************/
 
-#include "dropboxbackupplugin.h"
-#include "dropboxbackupsyncadaptor.h"
+#include "onedrivebackupqueryplugin.h"
+#include "onedrivebackupquerysyncadaptor.h"
 #include "socialnetworksyncadaptor.h"
 
-extern "C" DropboxBackupPlugin* createPlugin(const QString& pluginName,
+extern "C" OneDriveBackupQueryPlugin* createPlugin(const QString& pluginName,
                                        const Buteo::SyncProfile& profile,
                                        Buteo::PluginCbInterface *callbackInterface)
 {
-    return new DropboxBackupPlugin(pluginName, profile, callbackInterface);
+    return new OneDriveBackupQueryPlugin(pluginName, profile, callbackInterface);
 }
 
-extern "C" void destroyPlugin(DropboxBackupPlugin* plugin)
+extern "C" void destroyPlugin(OneDriveBackupQueryPlugin* plugin)
 {
     delete plugin;
 }
 
-DropboxBackupPlugin::DropboxBackupPlugin(const QString& pluginName,
+OneDriveBackupQueryPlugin::OneDriveBackupQueryPlugin(const QString& pluginName,
                              const Buteo::SyncProfile& profile,
                              Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
-                         QStringLiteral("dropbox"),
-                         SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::Backup))
+                         QStringLiteral("onedrive"),
+                         SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::BackupQuery))
 {
 }
 
-DropboxBackupPlugin::~DropboxBackupPlugin()
+OneDriveBackupQueryPlugin::~OneDriveBackupQueryPlugin()
 {
 }
 
-SocialNetworkSyncAdaptor *DropboxBackupPlugin::createSocialNetworkSyncAdaptor()
+SocialNetworkSyncAdaptor *OneDriveBackupQueryPlugin::createSocialNetworkSyncAdaptor()
 {
-    return new DropboxBackupSyncAdaptor(profile().name(), this);
+    return new OneDriveBackupQuerySyncAdaptor(profile().name(), this);
 }

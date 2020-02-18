@@ -18,29 +18,20 @@
  **
  ****************************************************************************/
 
-#ifndef ONEDRIVEBACKUPPLUGIN_H
-#define ONEDRIVEBACKUPPLUGIN_H
+#ifndef DROPBOXBACKUPQUERYSYNCADAPTOR_H
+#define DROPBOXBACKUPQUERYSYNCADAPTOR_H
 
-#include "socialdbuteoplugin.h"
+#include "dropboxbackupoperationsyncadaptor.h"
 
-class SOCIALDBUTEOPLUGIN_EXPORT OneDriveBackupPlugin : public SocialdButeoPlugin
+class DropboxBackupQuerySyncAdaptor : public DropboxBackupOperationSyncAdaptor
 {
     Q_OBJECT
 
 public:
-    OneDriveBackupPlugin(const QString& pluginName,
-                  const Buteo::SyncProfile& profile,
-                  Buteo::PluginCbInterface *cbInterface);
-    ~OneDriveBackupPlugin();
+    DropboxBackupQuerySyncAdaptor(const QString &profileName, QObject *parent);
+    ~DropboxBackupQuerySyncAdaptor();
 
-protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    DropboxBackupOperationSyncAdaptor::Operation operation() const override;
 };
 
-extern "C" OneDriveBackupPlugin* createPlugin(const QString& pluginName,
-                                              const Buteo::SyncProfile& profile,
-                                              Buteo::PluginCbInterface *cbInterface);
-
-extern "C" void destroyPlugin(OneDriveBackupPlugin* client);
-
-#endif // ONEDRIVEBACKUPPLUGIN_H
+#endif // DROPBOXBACKUPQUERYSYNCADAPTOR_H

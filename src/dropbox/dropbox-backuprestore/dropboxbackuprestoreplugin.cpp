@@ -18,36 +18,36 @@
  **
  ****************************************************************************/
 
-#include "dropboxbackupplugin.h"
-#include "dropboxbackupsyncadaptor.h"
+#include "dropboxbackuprestoreplugin.h"
+#include "dropboxbackuprestoresyncadaptor.h"
 #include "socialnetworksyncadaptor.h"
 
-extern "C" DropboxBackupPlugin* createPlugin(const QString& pluginName,
+extern "C" DropboxBackupRestorePlugin* createPlugin(const QString& pluginName,
                                        const Buteo::SyncProfile& profile,
                                        Buteo::PluginCbInterface *callbackInterface)
 {
-    return new DropboxBackupPlugin(pluginName, profile, callbackInterface);
+    return new DropboxBackupRestorePlugin(pluginName, profile, callbackInterface);
 }
 
-extern "C" void destroyPlugin(DropboxBackupPlugin* plugin)
+extern "C" void destroyPlugin(DropboxBackupRestorePlugin* plugin)
 {
     delete plugin;
 }
 
-DropboxBackupPlugin::DropboxBackupPlugin(const QString& pluginName,
+DropboxBackupRestorePlugin::DropboxBackupRestorePlugin(const QString& pluginName,
                              const Buteo::SyncProfile& profile,
                              Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
                          QStringLiteral("dropbox"),
-                         SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::Backup))
+                         SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::BackupRestore))
 {
 }
 
-DropboxBackupPlugin::~DropboxBackupPlugin()
+DropboxBackupRestorePlugin::~DropboxBackupRestorePlugin()
 {
 }
 
-SocialNetworkSyncAdaptor *DropboxBackupPlugin::createSocialNetworkSyncAdaptor()
+SocialNetworkSyncAdaptor *DropboxBackupRestorePlugin::createSocialNetworkSyncAdaptor()
 {
-    return new DropboxBackupSyncAdaptor(profile().name(), this);
+    return new DropboxBackupRestoreSyncAdaptor(profile().name(), this);
 }

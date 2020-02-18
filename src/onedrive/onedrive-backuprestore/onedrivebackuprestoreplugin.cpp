@@ -18,36 +18,36 @@
  **
  ****************************************************************************/
 
-#include "dropboxbackupplugin.h"
-#include "dropboxbackupsyncadaptor.h"
+#include "onedrivebackuprestoreplugin.h"
+#include "onedrivebackuprestoresyncadaptor.h"
 #include "socialnetworksyncadaptor.h"
 
-extern "C" DropboxBackupPlugin* createPlugin(const QString& pluginName,
+extern "C" OneDriveBackupRestorePlugin* createPlugin(const QString& pluginName,
                                        const Buteo::SyncProfile& profile,
                                        Buteo::PluginCbInterface *callbackInterface)
 {
-    return new DropboxBackupPlugin(pluginName, profile, callbackInterface);
+    return new OneDriveBackupRestorePlugin(pluginName, profile, callbackInterface);
 }
 
-extern "C" void destroyPlugin(DropboxBackupPlugin* plugin)
+extern "C" void destroyPlugin(OneDriveBackupRestorePlugin* plugin)
 {
     delete plugin;
 }
 
-DropboxBackupPlugin::DropboxBackupPlugin(const QString& pluginName,
+OneDriveBackupRestorePlugin::OneDriveBackupRestorePlugin(const QString& pluginName,
                              const Buteo::SyncProfile& profile,
                              Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
-                         QStringLiteral("dropbox"),
-                         SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::Backup))
+                         QStringLiteral("onedrive"),
+                         SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::BackupRestore))
 {
 }
 
-DropboxBackupPlugin::~DropboxBackupPlugin()
+OneDriveBackupRestorePlugin::~OneDriveBackupRestorePlugin()
 {
 }
 
-SocialNetworkSyncAdaptor *DropboxBackupPlugin::createSocialNetworkSyncAdaptor()
+SocialNetworkSyncAdaptor *OneDriveBackupRestorePlugin::createSocialNetworkSyncAdaptor()
 {
-    return new DropboxBackupSyncAdaptor(profile().name(), this);
+    return new OneDriveBackupRestoreSyncAdaptor(profile().name(), this);
 }
