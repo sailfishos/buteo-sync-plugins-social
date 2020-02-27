@@ -27,15 +27,13 @@
 #include <QtCore/QVariantMap>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QSslError>
+#include <QtDBus/QDBusConnection>
+#include <QtDBus/QDBusReply>
+#include <QtDBus/QDBusInterface>
 
-#include <Accounts/Manager>
-#include <Accounts/Account>
+namespace {
 
-// buteo
-#include <ProfileManager.h>
-#include <SyncProfile.h>
-
-static void debugDumpResponse(const QByteArray &data)
+void debugDumpResponse(const QByteArray &data)
 {
     QStringList lines = QString::fromUtf8(data).split('\n');
     Q_FOREACH (const QString &line, lines) {
@@ -43,16 +41,29 @@ static void debugDumpResponse(const QByteArray &data)
     }
 }
 
-DropboxBackupOperationSyncAdaptor::DropboxBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, const QString &profileName, QObject *parent)
+}
+
+
+DropboxBackupOperationSyncAdaptor::DropboxBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
     : DropboxDataTypeSyncAdaptor(dataType, parent)
-    , m_profileManager(new Buteo::ProfileManager)
-    , m_profileName(profileName)
+    , m_sailfishBackup(new QDBusInterface("org.sailfishos.backup", "/sailfishbackup", "org.sailfishos.backup", QDBusConnection::sessionBus(), this))
 {
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudBackupStatusChanged", this, SLOT(cloudBackupStatusChanged(int,QString)));
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudBackupError", this, SLOT(cloudBackupError(int,QString,QString)));
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudRestoreStatusChanged", this, SLOT(cloudRestoreStatusChanged(int,QString)));
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudRestoreError", this, SLOT(cloudRestoreError(int,QString,QString)));
 }
 
 DropboxBackupOperationSyncAdaptor::~DropboxBackupOperationSyncAdaptor()
 {
-    delete m_profileManager;
 }
 
 QString DropboxBackupOperationSyncAdaptor::syncServiceName() const
@@ -73,55 +84,63 @@ void DropboxBackupOperationSyncAdaptor::purgeDataForOldAccount(int oldId, Social
 
 void DropboxBackupOperationSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
-    bool backupRestoreOptionsLoaded = false;
-    Buteo::SyncProfile *syncProfile = m_profileManager->syncProfile(m_profileName);
-    BackupRestoreOptions backupRestoreOptions =
-            BackupRestoreOptions::fromProfile(syncProfile, &backupRestoreOptionsLoaded);
-    if (!backupRestoreOptionsLoaded) {
-        SOCIALD_LOG_ERROR("Could not load backup/restore options for" << m_profileName);
+    QDBusReply<QString> backupDeviceIdReply = m_sailfishBackup->call("backupFileDeviceId");
+    if (backupDeviceIdReply.value().isEmpty()) {
+        SOCIALD_LOG_ERROR("Backup device ID is invalid!");
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
-    // Immediately unset the backup/restore to ensure that future scheduled
-    // or manually triggered syncs fail, until the options are set again.
-    BackupRestoreOptions emptyOptions;
-    if (!emptyOptions.copyToProfile(syncProfile)
-            || m_profileManager->updateProfile(*syncProfile).isEmpty()) {
-        SOCIALD_LOG_ERROR("Warning: failed to reset backup/restore options for profile: " + m_profileName);
-    }
+    m_remoteDirPath = QString::fromLatin1("/Backups/%1").arg(backupDeviceIdReply.value());
+    m_accountId = accountId;
+    m_accessToken = accessToken;
 
-    if (backupRestoreOptions.localDirPath.isEmpty()) {
-        backupRestoreOptions.localDirPath = QString::fromLatin1("%1/Backups/").arg(PRIVILEGED_DATA_DIR);
-    }
-    // create local directory if it doesn't exist
-    QDir localDir;
-    if (!localDir.mkpath(backupRestoreOptions.localDirPath)) {
-        SOCIALD_LOG_ERROR("Could not create local backup directory:"
-                          << backupRestoreOptions.localDirPath
-                          << "for Dropbox account:" << accountId);
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        return;
-    }
-
-    if (backupRestoreOptions.remoteDirPath.isEmpty()) {
-        QString backupDeviceName = BackupRestoreOptions::backupDeviceName();
-        if (backupDeviceName.isEmpty()) {
-            SOCIALD_LOG_ERROR("backupDeviceName() returned empty string!");
+    switch (operation()) {
+    case Backup:
+    {
+        QDBusReply<QString> createBackupReply =
+                m_sailfishBackup->call("createBackupForSyncProfile", m_accountSyncProfile->name());
+        if (!createBackupReply.isValid() || createBackupReply.value().isEmpty()) {
+            SOCIALD_LOG_ERROR("Call to createBackupForSyncProfile() failed:" << createBackupReply.error().name()
+                              << createBackupReply.error().message());
             setStatus(SocialNetworkSyncAdaptor::Error);
             return;
         }
-        backupRestoreOptions.remoteDirPath = QString::fromLatin1("/Backups/%1").arg(backupDeviceName);
-    }
 
-    switch (operation()) {
+        // Save the file path, then wait for org.sailfish.backup service to finish creating the
+        // backup before continuing in cloudBackupStatusChanged().
+        // we're requesting data.  Increment the semaphore so that we know we're still busy.
+        incrementSemaphore(accountId);
+        m_localFileInfo = QFileInfo(createBackupReply.value());
+        break;
+    }
     case BackupQuery:
-        beginListOperation(accountId, accessToken, backupRestoreOptions);
+    {
+        requestList(accountId, accessToken, m_remoteDirPath, QString(), QVariantMap());
         break;
-    case Backup:
+    }
     case BackupRestore:
-        beginSyncOperation(accountId, accessToken, backupRestoreOptions);
+    {
+        const QString filePath = m_accountSyncProfile->key(QStringLiteral("sfos-backuprestore-file"));
+        if (filePath.isEmpty()) {
+            SOCIALD_LOG_ERROR("No remote file has been set!");
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            return;
+        }
+
+        m_localFileInfo = QFileInfo(filePath);
+
+        QDir localDir;
+        if (!localDir.mkpath(m_localFileInfo.absolutePath())) {
+            SOCIALD_LOG_ERROR("Could not create local backup directory:" << m_localFileInfo.absolutePath()
+                              << "for Dropbox account:" << accountId);
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            return;
+        }
+
+        beginSyncOperation(accountId, accessToken);
         break;
+    }
     default:
         SOCIALD_LOG_ERROR("Unrecognized sync operation: " + operation());
         setStatus(SocialNetworkSyncAdaptor::Error);
@@ -129,44 +148,99 @@ void DropboxBackupOperationSyncAdaptor::beginSync(int accountId, const QString &
     }
 }
 
-void DropboxBackupOperationSyncAdaptor::beginListOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options)
+void DropboxBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const QString &accessToken)
 {
-    if (options.localDirPath.isEmpty() || options.fileName.isEmpty()) {
-        SOCIALD_LOG_ERROR("Cannot fetch directory listing, no local results file path set!");
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        return;
-    }
-
-    QVariantMap properties = {
-        { QStringLiteral("listResultPath"), options.localDirPath + '/' + options.fileName },
-    };
-    requestList(accountId, accessToken, options.remoteDirPath, QString(), properties);
-}
-
-void DropboxBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options)
-{
-    QString remoteFile = options.fileName;
-    if (!remoteFile.isEmpty()) {
-        // dropbox requestData() function takes remoteFile param which has a fully specified path.
-        remoteFile = QStringLiteral("%1/%2").arg(options.remoteDirPath).arg(remoteFile);
-    }
+    // dropbox requestData() function takes remoteFile param which has a fully specified path.
+    QString remoteFile = QStringLiteral("%1/%2").arg(m_remoteDirPath).arg(m_localFileInfo.fileName());
 
     // either upsync or downsync as required.
     if (operation() == Backup) {
-        uploadData(accountId, accessToken, options.localDirPath, options.remoteDirPath);
+        uploadData(accountId, accessToken, m_localFileInfo.absolutePath(), m_remoteDirPath, m_localFileInfo.fileName());
     } else if (operation() == BackupRestore) {
         // step one: get the remote path and its children metadata.
         // step two: for each (non-folder) child in metadata, download it.
         QVariantMap properties = {
-            { QStringLiteral("localPath"), options.localDirPath },
+            { QStringLiteral("localPath"), m_localFileInfo.absolutePath() },
             { QStringLiteral("remoteFile"), remoteFile },
         };
-        requestList(accountId, accessToken, options.remoteDirPath, QString(), properties);
+        requestList(accountId, accessToken, m_remoteDirPath, QString(), properties);
     } else {
         SOCIALD_LOG_ERROR("No direction set for Dropbox Backup sync with account:" << accountId);
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
+}
+
+void DropboxBackupOperationSyncAdaptor::cloudBackupStatusChanged(int accountId, const QString &status)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_DEBUG("Backup status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+
+    if (status == QLatin1String("UploadingBackup")) {
+
+        if (!m_localFileInfo.exists()) {
+            SOCIALD_LOG_ERROR("Backup finished, but cannot find the backup file:" << m_localFileInfo.absoluteFilePath());
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            decrementSemaphore(m_accountId);
+            return;
+        }
+
+        beginSyncOperation(m_accountId, m_accessToken);
+        decrementSemaphore(m_accountId);
+
+    } else if (status == QLatin1String("Canceled")) {
+        SOCIALD_LOG_ERROR("Cloud backup was canceled");
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+
+    } else if (status == QLatin1String("Error")) {
+        SOCIALD_LOG_ERROR("Failed to create backup file:" << m_localFileInfo.absoluteFilePath());
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+    }
+}
+
+void DropboxBackupOperationSyncAdaptor::cloudBackupError(int accountId, const QString &error, const QString &errorString)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_ERROR("Cloud backup error was:" << error << errorString);
+    setStatus(SocialNetworkSyncAdaptor::Error);
+    decrementSemaphore(m_accountId);
+}
+
+void DropboxBackupOperationSyncAdaptor::cloudRestoreStatusChanged(int accountId, const QString &status)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_DEBUG("Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+
+    if (status == QLatin1String("Canceled")) {
+        SOCIALD_LOG_ERROR("Cloud backup restore was canceled");
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+
+    } else if (status == QLatin1String("Error")) {
+        SOCIALD_LOG_ERROR("Cloud backup restore failed");
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+    }
+}
+
+void DropboxBackupOperationSyncAdaptor::cloudRestoreError(int accountId, const QString &error, const QString &errorString)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_ERROR("Cloud backup restore error was:" << error << errorString);
 }
 
 void DropboxBackupOperationSyncAdaptor::requestList(int accountId,
@@ -300,36 +374,18 @@ void DropboxBackupOperationSyncAdaptor::remotePathFinishedHandler()
     switch (operation()) {
     case BackupQuery:
     {
-        QString listResultPath = reply->property("listResultPath").toString();
-        if (listResultPath.isEmpty()) {
-            SOCIALD_LOG_ERROR("Cannot save directory listing, no local results file path set");
-            setStatus(SocialNetworkSyncAdaptor::Error);
-            decrementSemaphore(accountId);
-            return;
-        }
-
         if (hasMore) {
-            QVariantMap properties = {
-                { QStringLiteral("listResultPath"), listResultPath },
-            };
-            requestList(accountId, accessToken, remotePath, continuationCursor, properties);
+            requestList(accountId, accessToken, remotePath, continuationCursor, QVariantMap());
         } else {
-            QFile file(listResultPath);
-            if (!file.open(QFile::WriteOnly | QFile::Text)) {
-                SOCIALD_LOG_ERROR("Cannot open" << file.fileName() << "to write directory listing results");
-                setStatus(SocialNetworkSyncAdaptor::Error);
-                decrementSemaphore(accountId);
-                return;
+            QDBusReply<void> setCloudBackupsReply =
+                    m_sailfishBackup->call("setCloudBackups", m_accountSyncProfile->name(),
+                                                QVariant(m_backupFiles.toList()));
+            if (!setCloudBackupsReply.isValid()) {
+                SOCIALD_LOG_DEBUG("Call to setCloudBackups() failed:" << setCloudBackupsReply.error().name()
+                                  << setCloudBackupsReply.error().message());
+            } else {
+                SOCIALD_LOG_DEBUG("Wrote directory listing for" << m_accountSyncProfile->name());
             }
-            QByteArray dirListingBytes = m_backupFiles.toList().join('\n').toUtf8();
-            if (file.write(dirListingBytes) < 0) {
-                SOCIALD_LOG_ERROR("Cannot write directory listing results to" << file.fileName());
-                setStatus(SocialNetworkSyncAdaptor::Error);
-                decrementSemaphore(accountId);
-                return;
-            }
-            file.close();
-            SOCIALD_LOG_DEBUG("Wrote directory listing to" << file.fileName());
         }
         break;
     }
@@ -345,8 +401,19 @@ void DropboxBackupOperationSyncAdaptor::remotePathFinishedHandler()
             };
             requestList(accountId, accessToken, remotePath, continuationCursor, properties);
         } else {
+            bool fileFound = false;
             for (QSet<QString>::const_iterator it = m_backupFiles.constBegin(); it != m_backupFiles.constEnd(); it++) {
-                requestData(accountId, accessToken, localPath, remotePath, *it);
+                if ((*it).endsWith(remoteFile)) {
+                    requestData(accountId, accessToken, localPath, remotePath, *it);
+                    fileFound = true;
+                    break;
+                }
+            }
+            if (!fileFound) {
+                SOCIALD_LOG_ERROR("Cannot find requested file on remote server:" << remoteFile);
+                setStatus(SocialNetworkSyncAdaptor::Error);
+                decrementSemaphore(accountId);
+                return;
             }
         }
         break;
@@ -412,6 +479,7 @@ void DropboxBackupOperationSyncAdaptor::remoteFileFinishedHandler()
     QString remoteFile = reply->property("remoteFile").toString();
     bool isError = reply->property("isError").toBool();
     reply->deleteLater();
+
     removeReplyTimeout(accountId, reply);
     if (isError) {
         SOCIALD_LOG_ERROR("error occurred when performing Backup remote file request for Dropbox account" << accountId);
@@ -424,19 +492,28 @@ void DropboxBackupOperationSyncAdaptor::remoteFileFinishedHandler()
     if (data.isEmpty()) {
         SOCIALD_LOG_INFO("remote file:" << remoteFile << "from" << remotePath << "is empty; ignoring");
     } else {
-        const QString filename = QStringLiteral("%1/%2").arg(localPath).arg(remoteFile.split('/').last());
-        QFile file(filename);
+        // create local directory if it doesn't exist
+        QFileInfo fileInfo(QStringLiteral("%1/%2").arg(localPath).arg(QFileInfo(remoteFile).fileName()));
+        QDir localDir;
+        if (!localDir.mkpath(fileInfo.absolutePath())) {
+            SOCIALD_LOG_ERROR("Could not create local backup directory:" << fileInfo.absolutePath()
+                              << "for Dropbox account:" << accountId);
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            return;
+        }
+
+        QFile file(fileInfo.absoluteFilePath());
         if (!file.open(QIODevice::WriteOnly)) {
-            SOCIALD_LOG_ERROR("could not open" << filename << "locally for writing!");
+            SOCIALD_LOG_ERROR("could not open" << file.fileName() << "locally for writing!");
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
         } else if (!file.write(data)) {
-            SOCIALD_LOG_ERROR("could not write data to" << filename << "locally from" <<
+            SOCIALD_LOG_ERROR("could not write data to" << file.fileName() << "locally from" <<
                               remotePath << remoteFile << "for Dropbox account:" << accountId);
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
         } else {
-            SOCIALD_LOG_DEBUG("successfully wrote" << data.size() << "bytes to:" << filename << "from:" << remoteFile);
+            SOCIALD_LOG_DEBUG("successfully wrote" << data.size() << "bytes to:" << file.fileName() << "from:" << remoteFile);
         }
         file.close();
     }
@@ -623,7 +700,13 @@ void DropboxBackupOperationSyncAdaptor::uploadProgressHandler(qint64 bytesSent, 
 
 void DropboxBackupOperationSyncAdaptor::finalize(int accountId)
 {
-    SOCIALD_LOG_DEBUG("finished Dropbox backup sync for account" << accountId);
+    SOCIALD_LOG_DEBUG("Finalize Dropbox backup sync for account" << accountId);
+
+    if (operation() == Backup) {
+        SOCIALD_LOG_DEBUG("Deleting created backup file" << m_localFileInfo.absoluteFilePath());
+        QFile::remove(m_localFileInfo.absoluteFilePath());
+        QDir().rmdir(m_localFileInfo.absolutePath());
+    }
 }
 
 void DropboxBackupOperationSyncAdaptor::purgeAccount(int)

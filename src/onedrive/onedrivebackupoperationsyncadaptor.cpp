@@ -29,15 +29,13 @@
 #include <QtCore/QVariantMap>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QSslError>
+#include <QtDBus/QDBusConnection>
+#include <QtDBus/QDBusReply>
+#include <QtDBus/QDBusInterface>
 
-#include <Accounts/Manager>
-#include <Accounts/Account>
+namespace  {
 
-// buteo
-#include <ProfileManager.h>
-#include <SyncProfile.h>
-
-static void debugDumpResponse(const QByteArray &data)
+void debugDumpResponse(const QByteArray &data)
 {
     QString alldata = QString::fromUtf8(data);
     QStringList alldatasplit = alldata.split('\n');
@@ -46,7 +44,7 @@ static void debugDumpResponse(const QByteArray &data)
     }
 }
 
-static void debugDumpJsonResponse(const QByteArray &data)
+void debugDumpJsonResponse(const QByteArray &data)
 {
     // 8 is the minimum log level for TRACE logs
     // as defined in Buteo's LogMacros.h
@@ -78,17 +76,29 @@ static void debugDumpJsonResponse(const QByteArray &data)
     debugDumpResponse(output.toUtf8());
 }
 
-OneDriveBackupOperationSyncAdaptor::OneDriveBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, const QString &profileName, QObject *parent)
+}
+
+OneDriveBackupOperationSyncAdaptor::OneDriveBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
     : OneDriveDataTypeSyncAdaptor(dataType, parent)
-    , m_profileManager(new Buteo::ProfileManager)
-    , m_profileName(profileName)
+    , m_sailfishBackup(new QDBusInterface("org.sailfishos.backup", "/sailfishbackup", "org.sailfishos.backup", QDBusConnection::sessionBus(), this))
     , m_remoteAppDir(QStringLiteral("drive/special/approot"))
 {
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudBackupStatusChanged", this, SLOT(cloudBackupStatusChanged(int,QString)));
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudBackupError", this, SLOT(cloudBackupError(int,QString,QString)));
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudRestoreStatusChanged", this, SLOT(cloudRestoreStatusChanged(int,QString)));
+    m_sailfishBackup->connection().connect(
+                m_sailfishBackup->service(), m_sailfishBackup->path(), m_sailfishBackup->interface(),
+                "cloudRestoreError", this, SLOT(cloudRestoreError(int,QString,QString)));
 }
 
 OneDriveBackupOperationSyncAdaptor::~OneDriveBackupOperationSyncAdaptor()
 {
-    delete m_profileManager;
 }
 
 QString OneDriveBackupOperationSyncAdaptor::syncServiceName() const
@@ -109,55 +119,62 @@ void OneDriveBackupOperationSyncAdaptor::purgeDataForOldAccount(int oldId, Socia
 
 void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
-    bool backupRestoreOptionsLoaded = false;
-    Buteo::SyncProfile *syncProfile = m_profileManager->syncProfile(m_profileName);
-    BackupRestoreOptions backupRestoreOptions =
-            BackupRestoreOptions::fromProfile(syncProfile, &backupRestoreOptionsLoaded);
-    if (!backupRestoreOptionsLoaded) {
-        SOCIALD_LOG_ERROR("Could not load backup/restore options for" << m_profileName);
+    QDBusReply<QString> backupDeviceIdReply = m_sailfishBackup->call("backupFileDeviceId");
+    if (backupDeviceIdReply.value().isEmpty()) {
+        SOCIALD_LOG_ERROR("Backup device ID is invalid!");
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
-    // Immediately unset the backup/restore to ensure that future scheduled
-    // or manually triggered syncs fail, until the options are set again.
-    BackupRestoreOptions emptyOptions;
-    if (!emptyOptions.copyToProfile(syncProfile)
-            || m_profileManager->updateProfile(*syncProfile).isEmpty()) {
-        SOCIALD_LOG_ERROR("Warning: failed to reset backup/restore options for profile: " + m_profileName);
-    }
+    m_remoteDirPath = QString::fromLatin1("Backups/%1").arg(backupDeviceIdReply.value());
+    m_accountId = accountId;
+    m_accessToken = accessToken;
 
-    if (backupRestoreOptions.localDirPath.isEmpty()) {
-        backupRestoreOptions.localDirPath = QString::fromLatin1("%1/Backups/").arg(PRIVILEGED_DATA_DIR);
-    }
-    // create local directory if it doesn't exist
-    QDir localDir;
-    if (!localDir.mkpath(backupRestoreOptions.localDirPath)) {
-        SOCIALD_LOG_ERROR("Could not create local backup directory:"
-                          << backupRestoreOptions.localDirPath
-                          << "for OneDrive account:" << accountId);
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        return;
-    }
-
-    if (backupRestoreOptions.remoteDirPath.isEmpty()) {
-        QString backupDeviceName = BackupRestoreOptions::backupDeviceName();
-        if (backupDeviceName.isEmpty()) {
-            SOCIALD_LOG_ERROR("backupDeviceName() returned empty string!");
+    switch (operation()) {
+    case Backup:
+    {
+        QDBusReply<QString> createBackupReply =
+                m_sailfishBackup->call("createBackupForSyncProfile", m_accountSyncProfile->name());
+        if (!createBackupReply.isValid() || createBackupReply.value().isEmpty()) {
+            SOCIALD_LOG_ERROR("Call to createBackupForSyncProfile() failed:" << createBackupReply.error().name()
+                              << createBackupReply.error().message());
             setStatus(SocialNetworkSyncAdaptor::Error);
             return;
         }
-        backupRestoreOptions.remoteDirPath = "Backups/" + backupDeviceName;
-    }
 
-    switch (operation()) {
+        // Wait for org.sailfish.backup service to finish creating the backup.
+        // we're requesting data.  Increment the semaphore so that we know we're still busy.
+        incrementSemaphore(accountId);
+        m_localFileInfo = QFileInfo(createBackupReply.value());
+        break;
+    }
     case BackupQuery:
-        beginListOperation(accountId, accessToken, backupRestoreOptions);
+    {
+        beginListOperation(accountId, accessToken, m_remoteDirPath);
         break;
-    case Backup:
+    }
     case BackupRestore:
-        beginSyncOperation(accountId, accessToken, backupRestoreOptions);
+    {
+        const QString filePath = m_accountSyncProfile->key(QStringLiteral("sfos-backuprestore-file"));
+        if (filePath.isEmpty()) {
+            SOCIALD_LOG_ERROR("No remote file has been set!");
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            return;
+        }
+
+        m_localFileInfo = QFileInfo(filePath);
+
+        QDir localDir;
+        if (!localDir.mkpath(m_localFileInfo.absolutePath())) {
+            SOCIALD_LOG_ERROR("Could not create local backup directory:" << m_localFileInfo.absolutePath()
+                              << "for OneDrive account:" << accountId);
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            return;
+        }
+
+        beginSyncOperation(accountId, accessToken);
         break;
+    }
     default:
         SOCIALD_LOG_ERROR("Unrecognized sync operation: " + operation());
         setStatus(SocialNetworkSyncAdaptor::Error);
@@ -165,15 +182,87 @@ void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString 
     }
 }
 
-void OneDriveBackupOperationSyncAdaptor::beginListOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options)
+void OneDriveBackupOperationSyncAdaptor::cloudBackupStatusChanged(int accountId, const QString &status)
 {
-    if (options.localDirPath.isEmpty() || options.fileName.isEmpty()) {
-        SOCIALD_LOG_ERROR("Cannot fetch directory listing, no local results file path set");
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_DEBUG("Backup status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+
+    if (status == QLatin1String("UploadingBackup")) {
+
+        if (!m_localFileInfo.exists()) {
+            SOCIALD_LOG_ERROR("Backup finished, but cannot find the backup file:" << m_localFileInfo.absoluteFilePath());
+            setStatus(SocialNetworkSyncAdaptor::Error);
+            decrementSemaphore(m_accountId);
+            return;
+        }
+
+        beginSyncOperation(m_accountId, m_accessToken);
+        decrementSemaphore(m_accountId);
+
+    } else if (status == QLatin1String("Canceled")) {
+        SOCIALD_LOG_ERROR("Cloud backup was canceled");
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+
+    } else if (status == QLatin1String("Error")) {
+        SOCIALD_LOG_ERROR("Failed to create backup file:" << m_localFileInfo.absoluteFilePath());
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+    }
+}
+
+void OneDriveBackupOperationSyncAdaptor::cloudBackupError(int accountId, const QString &error, const QString &errorString)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_ERROR("Cloud backup error was:" << error << errorString);
+    setStatus(SocialNetworkSyncAdaptor::Error);
+    decrementSemaphore(m_accountId);
+}
+
+void OneDriveBackupOperationSyncAdaptor::cloudRestoreStatusChanged(int accountId, const QString &status)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_DEBUG("Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+
+    if (status == QLatin1String("Canceled")) {
+        SOCIALD_LOG_ERROR("Cloud backup restore was canceled");
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+
+    } else if (status == QLatin1String("Error")) {
+        SOCIALD_LOG_ERROR("Cloud backup restore failed");
+        setStatus(SocialNetworkSyncAdaptor::Error);
+        decrementSemaphore(m_accountId);
+    }
+}
+
+void OneDriveBackupOperationSyncAdaptor::cloudRestoreError(int accountId, const QString &error, const QString &errorString)
+{
+    if (accountId != m_accountId) {
+        return;
+    }
+
+    SOCIALD_LOG_ERROR("Cloud backup restore error was:" << error << errorString);
+}
+
+void OneDriveBackupOperationSyncAdaptor::beginListOperation(int accountId, const QString &accessToken, const QString &remoteDirPath)
+{
+    if (remoteDirPath.isEmpty()) {
+        SOCIALD_LOG_ERROR("Cannot fetch directory listing, remote path path set");
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
-    QUrl url(QStringLiteral("https://api.onedrive.com/v1.0/drive/special/approot:/%1:/").arg(options.remoteDirPath));
+    QUrl url(QStringLiteral("https://api.onedrive.com/v1.0/drive/special/approot:/%1:/").arg(remoteDirPath));
     QUrlQuery query(url);
     QList<QPair<QString, QString> > queryItems;
     queryItems.append(QPair<QString, QString>(QStringLiteral("expand"), QStringLiteral("children")));
@@ -187,8 +276,7 @@ void OneDriveBackupOperationSyncAdaptor::beginListOperation(int accountId, const
     if (reply) {
         reply->setProperty("accountId", accountId);
         reply->setProperty("accessToken", accessToken);
-        reply->setProperty("remotePath", options.remoteDirPath);
-        reply->setProperty("listResultPath", options.localDirPath + '/' + options.fileName);
+        reply->setProperty("remotePath", remoteDirPath);
         connect(reply, &QNetworkReply::finished, this, &OneDriveBackupOperationSyncAdaptor::listOperationFinished);
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
@@ -204,7 +292,6 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     int accountId = reply->property("accountId").toInt();
-    QString listResultPath = reply->property("listResultPath").toString();
     QString remotePath = reply->property("remotePath").toString();
     int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     bool isError = reply->property("isError").toBool();
@@ -269,29 +356,18 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
         }
     }
 
-    QFile file(listResultPath);
-    if (!file.open(QFile::WriteOnly | QFile::Text)) {
-        SOCIALD_LOG_ERROR("Cannot open" << file.fileName() << "to write directory listing results");
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        decrementSemaphore(accountId);
-        return;
+    QDBusReply<void> setCloudBackupsReply =
+            m_sailfishBackup->call("setCloudBackups", m_accountSyncProfile->name(), dirListing);
+    if (!setCloudBackupsReply.isValid()) {
+        SOCIALD_LOG_DEBUG("Call to setCloudBackups() failed:" << setCloudBackupsReply.error().name()
+                          << setCloudBackupsReply.error().message());
+    } else {
+        SOCIALD_LOG_DEBUG("Wrote directory listing for profile:" << m_accountSyncProfile->name() << dirListing);
     }
-
-    const QByteArray dirListingBytes = dirListing.join('\n').toUtf8();
-    if (file.write(dirListingBytes) < 0) {
-        SOCIALD_LOG_ERROR("Cannot write directory listing results to" << file.fileName());
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        decrementSemaphore(accountId);
-        return;
-    }
-    file.close();
-    SOCIALD_LOG_DEBUG("Wrote directory listing to" << file.fileName());
-
     decrementSemaphore(accountId);
 }
 
-
-void OneDriveBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options)
+void OneDriveBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const QString &accessToken)
 {
     QString direction = operation() == Backup
             ? Buteo::VALUE_TO_REMOTE
@@ -305,7 +381,12 @@ void OneDriveBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const
     // either upsync or downsync as required.
     if (direction == Buteo::VALUE_TO_REMOTE || direction == Buteo::VALUE_FROM_REMOTE) {
         // Perform an initial app folder request before upload/download.
-        initialiseAppFolderRequest(accountId, accessToken, options.localDirPath, options.remoteDirPath, options.fileName, direction);
+        initialiseAppFolderRequest(accountId,
+                                   accessToken,
+                                   m_localFileInfo.absolutePath(),
+                                   m_remoteDirPath,
+                                   m_localFileInfo.fileName(),
+                                   direction);
     } else {
         SOCIALD_LOG_ERROR("No direction set for OneDrive Backup sync with account:" << accountId);
         setStatus(SocialNetworkSyncAdaptor::Error);
@@ -406,7 +487,6 @@ void OneDriveBackupOperationSyncAdaptor::initialiseAppFolderFinishedHandler()
 
     decrementSemaphore(accountId);
 }
-
 
 void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadata(int accountId, const QString &accessToken, const QString &localPath, const QString &remotePath, const QString &parentId, const QString &remoteDirName)
 {
@@ -890,12 +970,18 @@ void OneDriveBackupOperationSyncAdaptor::uploadProgressHandler(qint64 bytesSent,
 
 void OneDriveBackupOperationSyncAdaptor::finalize(int accountId)
 {
-    SOCIALD_LOG_DEBUG("finished OneDrive backup sync for account" << accountId);
+    SOCIALD_LOG_DEBUG("Finalize OneDrive backup sync for account" << accountId);
+
+    if (operation() == Backup) {
+        SOCIALD_LOG_DEBUG("Deleting created backup file" << m_localFileInfo.absoluteFilePath());
+        QFile::remove(m_localFileInfo.absoluteFilePath());
+        QDir().rmdir(m_localFileInfo.absolutePath());
+    }
 }
 
 void OneDriveBackupOperationSyncAdaptor::purgeAccount(int)
 {
-    // TODO: delete the contents of the localPath directory?  probably not, could be shared between onedrive+dropbox
+    // TODO: delete the contents of the localPath directory?  probably not, could be shared between dropbox+onedrive
 }
 
 void OneDriveBackupOperationSyncAdaptor::finalCleanup()

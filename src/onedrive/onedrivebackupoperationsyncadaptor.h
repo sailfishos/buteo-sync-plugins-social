@@ -22,16 +22,11 @@
 #define ONEDRIVEBACKUPOPERATIONSYNCADAPTOR_H
 
 #include "onedrivedatatypesyncadaptor.h"
-#include "backuprestoreoptions_p.h"
 
 #include <QtCore/QObject>
 #include <QtCore/QList>
 #include <QtCore/QStringList>
-#include <QtCore/QSet>
-
-namespace Buteo {
-    class ProfileManager;
-}
+#include <QtCore/QFileInfo>
 
 class OneDriveBackupOperationSyncAdaptor : public OneDriveDataTypeSyncAdaptor
 {
@@ -44,7 +39,7 @@ public:
         BackupRestore
     };
 
-    OneDriveBackupOperationSyncAdaptor(DataType dataType, const QString &profileName, QObject *parent);
+    OneDriveBackupOperationSyncAdaptor(DataType dataType, QObject *parent);
     ~OneDriveBackupOperationSyncAdaptor();
 
     QString syncServiceName() const override;
@@ -75,6 +70,11 @@ private:
     void purgeAccount(int accountId);
 
 private Q_SLOTS:
+    void cloudBackupStatusChanged(int accountId, const QString &status);
+    void cloudBackupError(int accountId, const QString &error, const QString &errorString);
+    void cloudRestoreStatusChanged(int accountId, const QString &status);
+    void cloudRestoreError(int accountId, const QString &error, const QString &errorString);
+
     void initialiseAppFolderFinishedHandler();
     void getRemoteFolderMetadataFinishedHandler();
     void remotePathFinishedHandler();
@@ -85,13 +85,11 @@ private Q_SLOTS:
     void uploadProgressHandler(qint64 bytesSent, qint64 bytesTotal);
 
 private:
-    void beginListOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options);
-    void beginSyncOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options);
+    void beginListOperation(int accountId, const QString &accessToken, const QString &remoteDirPath);
+    void beginSyncOperation(int accountId, const QString &accessToken);
     void listOperationFinished();
 
-    Buteo::ProfileManager *m_profileManager;
-
-    QString m_profileName;
+    QDBusInterface *m_sailfishBackup = nullptr;
     QString m_remoteAppDir;
 
     struct RemoteDirectory {
@@ -102,6 +100,10 @@ private:
         bool created;
     };
     QList<RemoteDirectory> m_remoteDirectories;
+    QString m_accessToken;
+    QString m_remoteDirPath;
+    QFileInfo m_localFileInfo;
+    int m_accountId = 0;
 };
 
 #endif // ONEDRIVEBACKUPOPERATIONSYNCADAPTOR_H
