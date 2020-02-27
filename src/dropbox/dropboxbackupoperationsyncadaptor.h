@@ -18,20 +18,18 @@
  **
  ****************************************************************************/
 
-#ifndef DropboxBackupOperationSyncAdaptor_H
-#define DropboxBackupOperationSyncAdaptor_H
+#ifndef DROPBOXBACKUPOPERATIONSYNCADAPTOR_H
+#define DROPBOXBACKUPOPERATIONSYNCADAPTOR_H
 
 #include "dropboxdatatypesyncadaptor.h"
-#include "backuprestoreoptions_p.h"
 
 #include <QtCore/QObject>
 #include <QtCore/QList>
 #include <QtCore/QStringList>
 #include <QtCore/QSet>
+#include <QtCore/QFileInfo>
 
-namespace Buteo {
-    class ProfileManager;
-}
+class QDBusInterface;
 
 class DropboxBackupOperationSyncAdaptor : public DropboxDataTypeSyncAdaptor
 {
@@ -44,7 +42,7 @@ public:
         BackupRestore
     };
 
-    DropboxBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, const QString &profileName, QObject *parent);
+    DropboxBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     ~DropboxBackupOperationSyncAdaptor();
 
     QString syncServiceName() const override;
@@ -63,18 +61,26 @@ private:
                      const QString &remotePath,
                      const QString &continuationCursor,
                      const QVariantMap &extraProperties);
-    void requestData(int accountId, const QString &accessToken,
-                     const QString &localPath, const QString &remotePath,
-                     const QString &remoteFile = QString());
-    void uploadData(int accountId, const QString &accessToken,
-                    const QString &localPath, const QString &remotePath,
-                    const QString &localFile = QString());
+    void requestData(int accountId,
+                     const QString &accessToken,
+                     const QString &localPath,
+                     const QString &remotePath,
+                     const QString &remoteFile);
+    void uploadData(int accountId,
+                    const QString &accessToken,
+                    const QString &localPath,
+                    const QString &remotePath,
+                    const QString &localFile);
     void purgeAccount(int accountId);
 
-    void beginListOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options);
-    void beginSyncOperation(int accountId, const QString &accessToken, const BackupRestoreOptions &options);
+    void beginSyncOperation(int accountId, const QString &accessToken);
 
 private Q_SLOTS:
+    void cloudBackupStatusChanged(int accountId, const QString &status);
+    void cloudBackupError(int accountId, const QString &error, const QString &errorString);
+    void cloudRestoreStatusChanged(int accountId, const QString &status);
+    void cloudRestoreError(int accountId, const QString &error, const QString &errorString);
+
     void remotePathFinishedHandler();
     void remoteFileFinishedHandler();
     void createRemotePathFinishedHandler();
@@ -83,10 +89,12 @@ private Q_SLOTS:
     void uploadProgressHandler(qint64 bytesSent, qint64 bytesTotal);
 
 private:
-    Buteo::ProfileManager *m_profileManager;
-
+    QDBusInterface *m_sailfishBackup = nullptr;
+    QFileInfo m_localFileInfo;
     QSet<QString> m_backupFiles;
-    QString m_profileName;
+    QString m_remoteDirPath;
+    QString m_accessToken;
+    int m_accountId = 0;
 };
 
 #endif // DropboxBackupOperationSyncAdaptor_H
