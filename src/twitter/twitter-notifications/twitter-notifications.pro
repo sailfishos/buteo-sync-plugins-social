@@ -10,19 +10,13 @@ twitter_notifications_sync_profile.path = /etc/buteo/profiles/sync
 twitter_notifications_sync_profile.files = $$PWD/twitter.Notifications.xml
 twitter_notifications_client_plugin_xml.path = /etc/buteo/profiles/client
 twitter_notifications_client_plugin_xml.files = $$PWD/twitter-notifications.xml
-twitter_notifications_notification_xml.path = /usr/share/lipstick/notificationcategories/
-twitter_notifications_notification_xml.files = \
-    $$PWD/x-nemo.social.twitter.mention.conf \
-    $$PWD/x-nemo.social.twitter.retweet.conf \
-    $$PWD/x-nemo.social.twitter.follower.conf
 
 HEADERS += twitternotificationsplugin.h
 SOURCES += twitternotificationsplugin.cpp
 
 OTHER_FILES += \
     twitter_notifications_sync_profile.files \
-    twitter_notifications_client_plugin_xml.files \
-    twitter_notifications_notification_xml.files
+    twitter_notifications_client_plugin_xml.files
 
 # translations
 TWITTER_TS_FILE = $$OUT_PWD/lipstick-jolla-home-twitter-notif.ts
@@ -52,6 +46,5 @@ INSTALLS += \
     target \
     twitter_notifications_sync_profile \
     twitter_notifications_client_plugin_xml \
-    twitter_notifications_notification_xml \
     twitter_ts_install \
     twitter_engineering_english_install

@@ -258,9 +258,6 @@ Requires: %{name} = %{version}-%{release}
 #%%{_libdir}/buteo-plugins-qt5/libtwitter-notifications-client.so
 %config %{_sysconfdir}/buteo/profiles/client/twitter-notifications.xml
 %config %{_sysconfdir}/buteo/profiles/sync/twitter.Notifications.xml
-%{_datadir}/lipstick/notificationcategories/x-nemo.social.twitter.mention.conf
-%{_datadir}/lipstick/notificationcategories/x-nemo.social.twitter.retweet.conf
-%{_datadir}/lipstick/notificationcategories/x-nemo.social.twitter.follower.conf
 %{_datadir}/translations/lipstick-jolla-home-twitter-notif_eng_en.qm
 
 %pre twitter-notifications
@@ -292,7 +289,6 @@ Requires: %{name} = %{version}-%{release}
 #%%{_libdir}/buteo-plugins-qt5/libtwitter-posts-client.so
 %config %{_sysconfdir}/buteo/profiles/client/twitter-posts.xml
 %config %{_sysconfdir}/buteo/profiles/sync/twitter.Posts.xml
-%{_datadir}/lipstick/notificationcategories/x-nemo.social.twitter.tweet.conf
 
 %pre twitter-posts
 USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")
@@ -345,7 +341,6 @@ Requires: %{name} = %{version}-%{release}
 %{summary}.
 
 %files vk-posts
-%{_datadir}/lipstick/notificationcategories/x-nemo.social.vk.statuspost.conf
 #%{_datadir}/translations/lipstick-jolla-home-vk_eng_en.qm
 #out-of-process-plugin form:
 %{_libdir}/buteo-plugins-qt5/oopp/vk-posts-client
@@ -517,7 +512,6 @@ Requires: %{name} = %{version}-%{release}
 #%%{_libdir}/buteo-plugins-qt5/libvk-notifications-client.so
 %config %{_sysconfdir}/buteo/profiles/client/vk-notifications.xml
 %config %{_sysconfdir}/buteo/profiles/sync/vk.Notifications.xml
-%{_datadir}/lipstick/notificationcategories/x-nemo.social.vk.notification.conf
 
 %pre vk-notifications
 USERS=$(getent group users | cut -d ":" -f 4 | tr "," "\n")

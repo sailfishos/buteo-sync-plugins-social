@@ -583,7 +583,9 @@ Notification *TwitterNotificationSyncAdaptor::createNotification(int accountId, 
     notification = new Notification(this);
     //% "Twitter"
     notification->setAppName(qtTrId("qtn_social_notifications_twitter"));
+    notification->setAppIcon("icon-lock-twitter");
     notification->setHintValue("x-nemo.sociald.account-id", accountId);
+    notification->setHintValue("x-nemo-feedback", "social");
     if (ntype == TwitterNotificationSyncAdaptor::Mention) {
         notification->setCategory(QLatin1String("x-nemo.social.twitter.mention"));
     } else if (ntype == TwitterNotificationSyncAdaptor::Retweet) {
