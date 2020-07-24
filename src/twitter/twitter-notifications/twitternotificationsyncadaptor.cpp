@@ -300,6 +300,8 @@ void TwitterNotificationSyncAdaptor::finishedMentionsHandler()
                 notification->setBody(qtTrId("qtn_social_notifications_twitter_n_mentions_include_n", notification->itemCount()));
                 openUrlArgs << QLatin1String("https://mobile.twitter.com/i/connect");
             }
+            notification->clearPreviewSummary();
+            notification->clearPreviewBody();
             notification->setRemoteAction(OPEN_BROWSER_ACTION(openUrlArgs));
             notification->publish();
             if (notification->replacesId() == 0) {
@@ -397,6 +399,8 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
                 notification->setBody(qtTrId("qtn_social_notifications_twitter_m_n_retweets_include_n", delta));
                 openUrlArgs << QLatin1String("https://mobile.twitter.com/i/connect");
             }
+            notification->clearPreviewSummary();
+            notification->clearPreviewBody();
             notification->setRemoteAction(OPEN_BROWSER_ACTION(openUrlArgs));
             notification->publish();
             if (notification->replacesId() == 0) {
@@ -506,6 +510,9 @@ void TwitterNotificationSyncAdaptor::finishedFollowersHandler()
                 //: The number of new followers (n) the user has on Twitter.  Include n.  e.g. "You" + "have 5 new followers".
                 //% "have %n new followers"
                 notification->setBody(qtTrId("qtn_social_notifications_n_followers_include_n", notification->itemCount()));
+                notification->clearPreviewSummary();
+                notification->clearPreviewBody();
+
                 QStringList openUrlArgs;
                 openUrlArgs << QLatin1String("https://mobile.twitter.com/i/connect");
                 notification->setRemoteAction(OPEN_BROWSER_ACTION(openUrlArgs));
@@ -550,6 +557,7 @@ void TwitterNotificationSyncAdaptor::finishedUserShowHandler()
     if (ok && (response.contains("name") || response.contains("screen_name"))) {
         QString name = response.value("name").toString();
         QString screenName = response.value("screen_name").toString();
+
         Notification *notification = createNotification(accountId, Retweet);
         notification->setItemCount(1);
         notification->setTimestamp(QDateTime::currentDateTimeUtc());
@@ -557,6 +565,9 @@ void TwitterNotificationSyncAdaptor::finishedUserShowHandler()
         //: Text telling the user that another user has followed them, e.g.: "John Smith" + "followed you".
         //% "followed you"
         notification->setBody(qtTrId("qtn_social_notifications_twitter_followed_you"));
+        notification->clearPreviewSummary();
+        notification->clearPreviewBody();
+
         QStringList openUrlArgs;
         openUrlArgs << QLatin1String("https://mobile.twitter.com/i/connect");
         notification->setRemoteAction(OPEN_BROWSER_ACTION(openUrlArgs));
