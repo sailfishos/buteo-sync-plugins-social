@@ -1,7 +1,7 @@
 /****************************************************************************
  **
- ** Copyright (C) 2014 Jolla Ltd.
- ** Contact: Chris Adams <chris.adams@jollamobile.com>
+ ** Copyright (c) 2014 - 2019 Jolla Ltd.
+ ** Copyright (c) 2020 Open Mobile Platform LLC.
  **
  ****************************************************************************/
 
@@ -11,23 +11,21 @@
 #include "constants_p.h"
 #include "trace.h"
 
-#include <twowaycontactsyncadapter_impl.h>
+#include <twowaycontactsyncadaptor_impl.h>
 #include <qtcontacts-extensions_manager_impl.h>
+#include <qcontactstatusflags_impl.h>
 
 #include <QtCore/QUrl>
 #include <QtCore/QUrlQuery>
 #include <QtCore/QFile>
-#include <QtCore/QByteArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
-#include <QtCore/QJsonValue>
 #include <QtGui/QImageReader>
 
-#include <QtContacts/QContactDetailFilter>
-#include <QtContacts/QContactIntersectionFilter>
 #include <QtContacts/QContact>
-#include <QtContacts/QContactSyncTarget>
+#include <QtContacts/QContactCollection>
+#include <QtContacts/QContactCollectionFilter>
 #include <QtContacts/QContactGuid>
 #include <QtContacts/QContactName>
 #include <QtContacts/QContactNickname>
@@ -35,16 +33,13 @@
 #include <QtContacts/QContactAddress>
 #include <QtContacts/QContactUrl>
 #include <QtContacts/QContactGender>
-#include <QtContacts/QContactNote>
 #include <QtContacts/QContactBirthday>
 #include <QtContacts/QContactPhoneNumber>
-#include <QtContacts/QContactEmailAddress>
 
 //libaccounts-qt5
 #include <Accounts/Account>
 #include <Accounts/Manager>
 
-#define SOCIALD_VK_CONTACTS_SYNCTARGET QLatin1String("vk")
 #define SOCIALD_VK_MAX_CONTACT_ENTRY_RESULTS 200
 
 static const char *IMAGE_DOWNLOADER_TOKEN_KEY = "token";
@@ -52,147 +47,149 @@ static const char *IMAGE_DOWNLOADER_ACCOUNT_ID_KEY = "account_id";
 static const char *IMAGE_DOWNLOADER_IDENTIFIER_KEY = "identifier";
 
 namespace {
-    bool saveNonexportableDetail(QContact &c, QContactDetail &d)
-    {
-        d.setValue(QContactDetail__FieldNonexportable, QVariant::fromValue<bool>(true));
-        return c.saveDetail(&d);
+
+const QString FriendCollectionName = QStringLiteral("vk-friends");
+
+bool saveNonexportableDetail(QContact &c, QContactDetail &d)
+{
+    d.setValue(QContactDetail__FieldNonexportable, QVariant::fromValue<bool>(true));
+    return c.saveDetail(&d);
+}
+
+QContactCollection findCollection(const QContactManager &contactManager, const QString &name, int accountId)
+{
+    const QList<QContactCollection> collections = contactManager.collections();
+    for (const QContactCollection &collection : collections) {
+        if (collection.metaData(QContactCollection::KeyName).toString() == name
+                && collection.extendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_ACCOUNTID).toInt() == accountId) {
+            return collection;
+        }
     }
+    return QContactCollection();
+}
 
-    int matchingContactIndex(QContact *contact, const QList<QContact> &existing, bool *hasChanged)
-    {
-        QContact fromServer = *contact;
-        const QString &guidstr = contact->detail<QContactGuid>().guid();
-        for (int i = 0; i < existing.size(); ++i) {
-            const QContact &c(existing[i]);
-            if (c.detail<QContactGuid>().guid() == guidstr) {
-                // we've found this contact in the local database
-                SOCIALD_LOG_TRACE("Found matching existing VK contact:" << c.detail<QContactName>() << "with guid:" << c.detail<QContactGuid>().guid() <<
-                                  "for synced VK friend:" << contact->detail<QContactName>() << "wih guid:" << contact->detail<QContactGuid>().guid());
-                // determine whether it was modified remotely
-                *hasChanged = false;
-                QContact modified = c;
-                if (c.detail<QContactName>().firstName() != fromServer.detail<QContactName>().firstName()
-                        || c.detail<QContactName>().lastName() != fromServer.detail<QContactName>().lastName()) {
-                    QContactName modName = modified.detail<QContactName>();
-                    modName.setFirstName(fromServer.detail<QContactName>().firstName());
-                    modName.setLastName(fromServer.detail<QContactName>().lastName());
-                    saveNonexportableDetail(modified, modName);
-                    *hasChanged = true;
-                }
-                if (c.detail<QContactGender>().gender() != fromServer.detail<QContactGender>().gender()) {
-                    QContactGender modGender = modified.detail<QContactGender>();
-                    modGender.setGender(fromServer.detail<QContactGender>().gender());
-                    saveNonexportableDetail(modified, modGender);
-                    *hasChanged = true;
-                }
-                if (c.detail<QContactBirthday>().dateTime() != fromServer.detail<QContactBirthday>().dateTime()) {
-                    QContactBirthday modBirthday = modified.detail<QContactBirthday>();
-                    modBirthday.setDateTime(fromServer.detail<QContactBirthday>().dateTime());
-                    saveNonexportableDetail(modified, modBirthday);
-                    *hasChanged = true;
-                }
-                if (c.detail<QContactNickname>().nickname() != fromServer.detail<QContactNickname>().nickname()) {
-                    QContactNickname modNickname = modified.detail<QContactNickname>();
-                    modNickname.setNickname(fromServer.detail<QContactNickname>().nickname());
-                    saveNonexportableDetail(modified, modNickname);
-                    *hasChanged = true;
-                }
-                if (c.detail<QContactAvatar>().imageUrl() != fromServer.detail<QContactAvatar>().imageUrl()) {
-                    QContactAvatar modAvatar = modified.detail<QContactAvatar>();
-                    modAvatar.setImageUrl(fromServer.detail<QContactAvatar>().imageUrl()); // XXX TODO: transform first!
-                    saveNonexportableDetail(modified, modAvatar);
-                    *hasChanged = true;
-                }
-                if (c.detail<QContactAddress>().locality() != fromServer.detail<QContactAddress>().locality()
-                        || c.detail<QContactAddress>().country() != fromServer.detail<QContactAddress>().country()) {
-                    QContactAddress modAddr = modified.detail<QContactAddress>();
-                    modAddr.setLocality(fromServer.detail<QContactAddress>().locality());
-                    modAddr.setCountry(fromServer.detail<QContactAddress>().country());
-                    saveNonexportableDetail(modified, modAddr);
-                    *hasChanged = true;
-                }
-                if (c.detail<QContactUrl>().url() != fromServer.detail<QContactUrl>().url()) {
-                    QContactUrl modUrl = modified.detail<QContactUrl>();
-                    modUrl.setUrl(fromServer.detail<QContactUrl>().url());
-                    modUrl.setSubType(fromServer.detail<QContactUrl>().subType());
-                    saveNonexportableDetail(modified, modUrl);
-                    *hasChanged = true;
-                }
-                const QList<QContactPhoneNumber> &mphns(modified.details<QContactPhoneNumber>());
-                const QList<QContactPhoneNumber> &sphns(fromServer.details<QContactPhoneNumber>());
-                // there should be exactly zero, one or two phone numbers on VK.
-                QContactPhoneNumber mMobile, mHome, sMobile, sHome;
-                foreach (const QContactPhoneNumber &phn, mphns) {
-                    if (phn.subTypes().contains(QContactPhoneNumber::SubTypeMobile)) {
-                        mMobile = phn;
-                    } else {
-                        mHome = phn;
-                    }
-                }
-                foreach (const QContactPhoneNumber &phn, sphns) {
-                    if (phn.subTypes().contains(QContactPhoneNumber::SubTypeMobile)) {
-                        sMobile = phn;
-                    } else {
-                        sHome = phn;
-                    }
-                }
-                if (mMobile.number() != sMobile.number()) {
-                    mMobile.setNumber(sMobile.number());
-                    saveNonexportableDetail(modified, mMobile);
-                    *hasChanged = true;
-                }
-                if (mHome.number() != sHome.number()) {
-                    mHome.setNumber(sHome.number());
-                    saveNonexportableDetail(modified, mHome);
-                    *hasChanged = true;
-                }
-                return i;
-            }
+QContact findContact(const QList<QContact> &contacts, const QString &guid)
+{
+    for (const QContact &contact : contacts) {
+        if (contact.detail<QContactGuid>().guid() == guid) {
+            return contact;
         }
-
-        // the contact doesn't exist in the local database.
-        // it must be a remote addition.
-        return -1;
     }
+    return QContact();
+}
 
-    void calculateRemoteDelta(const QList<QContact> &allReceivedContacts, const QList<QContact> &localVkContacts, QList<QContact> *additions, QList<QContact> *modifications, QList<QContact> *deletions)
-    {
-        // determine deletions
-        for (int i = 0; i < localVkContacts.size(); ++i) {
-            const QContact &c(localVkContacts[i]);
-            const QString &existingGuid = c.detail<QContactGuid>().guid();
-            bool found = false;
-            foreach (const QContact &rc, allReceivedContacts) {
-                if (rc.detail<QContactGuid>().guid() == existingGuid) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                // must have been deleted remotely.
-                deletions->append(c);
-            }
-        }
+}
 
-        // determine additions/modifications
-        for (int i = 0; i < allReceivedContacts.size(); ++i) {
-            QContact c = allReceivedContacts[i];
-            bool hasChanged = false;
-            int idx = matchingContactIndex(&c, localVkContacts, &hasChanged);
-            if (idx < 0) {
-                // new contact
-                additions->append(c);
-            } else if (hasChanged) {
-                // modified contact
-                modifications->append(c);
-            }
-        }
+//---------------
+
+VKContactSqliteSyncAdaptor::VKContactSqliteSyncAdaptor(int accountId, VKContactSyncAdaptor *parent)
+    : QtContactsSqliteExtensions::TwoWayContactSyncAdaptor(accountId, qAppName(), *parent->m_contactManager)
+    , q(parent)
+    , m_accountId(accountId)
+{
+    m_collection = findCollection(contactManager(), FriendCollectionName, m_accountId);
+    if (m_collection.id().isNull()) {
+        SOCIALD_LOG_DEBUG("No friends collection saved yet for account:" << m_accountId);
+
+        m_collection.setMetaData(QContactCollection::KeyName, FriendCollectionName);
+        m_collection.setMetaData(QContactCollection::KeyDescription, QStringLiteral("VK friend contacts"));
+        m_collection.setMetaData(QContactCollection::KeyColor, QStringLiteral("steelblue"));
+        m_collection.setMetaData(QContactCollection::KeySecondaryColor, QStringLiteral("lightsteelblue"));
+        m_collection.setExtendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_APPLICATIONNAME, QCoreApplication::applicationName());
+        m_collection.setExtendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_ACCOUNTID, m_accountId);
+        m_collection.setExtendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_READONLY, true);
+    } else {
+        SOCIALD_LOG_DEBUG("Found friends collection" << m_collection.id() << "for account:" << m_accountId);
     }
 }
 
+VKContactSqliteSyncAdaptor::~VKContactSqliteSyncAdaptor()
+{
+}
+
+bool VKContactSqliteSyncAdaptor::determineRemoteCollections()
+{
+    remoteCollectionsDetermined(QList<QContactCollection>() << m_collection);
+    return true;
+}
+
+bool VKContactSqliteSyncAdaptor::deleteRemoteCollection(const QContactCollection &collection)
+{
+    SOCIALD_LOG_ERROR("Upsync to remote not supported, not deleting collection" << collection.id());
+    return true;
+}
+
+bool VKContactSqliteSyncAdaptor::determineRemoteContacts(const QContactCollection &collection)
+{
+    Q_UNUSED(collection)
+
+    q->requestData(accountIdForCollection(collection), 0);
+    return true;
+}
+
+bool VKContactSqliteSyncAdaptor::storeLocalChangesRemotely(const QContactCollection &collection,
+                                                           const QList<QContact> &addedContacts,
+                                                           const QList<QContact> &modifiedContacts,
+                                                           const QList<QContact> &deletedContacts)
+{
+    Q_UNUSED(collection)
+    Q_UNUSED(addedContacts)
+    Q_UNUSED(modifiedContacts)
+
+    for (const QContact &contact : deletedContacts) {
+        q->deleteDownloadedAvatar(contact);
+    }
+
+    SOCIALD_LOG_DEBUG("Upsync to remote not supported, ignoring remote changes for"
+                      << collection.id());
+    return true;
+}
+
+void VKContactSqliteSyncAdaptor::storeRemoteChangesLocally(const QContactCollection &collection,
+                                                           const QList<QContact> &addedContacts,
+                                                           const QList<QContact> &modifiedContacts,
+                                                           const QList<QContact> &deletedContacts)
+{
+    Q_UNUSED(addedContacts)
+    Q_UNUSED(modifiedContacts)
+
+    for (const QContact &contact : deletedContacts) {
+        q->deleteDownloadedAvatar(contact);
+    }
+
+    QtContactsSqliteExtensions::TwoWayContactSyncAdaptor::storeRemoteChangesLocally(collection, addedContacts, modifiedContacts, deletedContacts);
+}
+
+void VKContactSqliteSyncAdaptor::syncFinishedSuccessfully()
+{
+    SOCIALD_LOG_DEBUG("Sync finished OK");
+
+    // If this is the first sync, TWCSA will have saved the collection and given it a valid id, so
+    // update m_collection so that any post-sync operations (e.g. saving of queued avatar downloads)
+    // will refer to a valid collection.
+    const QContactCollection savedCollection = findCollection(contactManager(), FriendCollectionName, m_accountId);
+    if (savedCollection.id().isNull()) {
+        SOCIALD_LOG_DEBUG("Error: cannot find saved friends collection!");
+    } else {
+        m_collection.setId(savedCollection.id());
+    }
+}
+
+void VKContactSqliteSyncAdaptor::syncFinishedWithError()
+{
+    SOCIALD_LOG_DEBUG("Sync finished with error");
+}
+
+int VKContactSqliteSyncAdaptor::accountIdForCollection(const QContactCollection &collection)
+{
+    return collection.extendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_ACCOUNTID).toInt();
+}
+
+//----------------------------------
+
 VKContactSyncAdaptor::VKContactSyncAdaptor(QObject *parent)
     : VKDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::Contacts, parent)
-    , QtContactsSqliteExtensions::TwoWayContactSyncAdapter(QStringLiteral("vk"))
+    , m_contactManager(new QContactManager(QStringLiteral("org.nemomobile.contacts.sqlite")))
     , m_workerObject(new VKContactImageDownloader())
 {
     connect(m_workerObject, &AbstractImageDownloader::imageDownloaded,
@@ -222,58 +219,17 @@ void VKContactSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 
 void VKContactSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode)
 {
-    QContactDetailFilter syncTargetFilter;
-    syncTargetFilter.setDetailType(QContactDetail::TypeSyncTarget, QContactSyncTarget::FieldSyncTarget);
-    syncTargetFilter.setValue(SOCIALD_VK_CONTACTS_SYNCTARGET);
-    QContactFetchHint noRelationships;
-    noRelationships.setOptimizationHints(QContactFetchHint::NoRelationships);
-
-    int purgeCount = 0;
-    QList<QContactId> contactsToRemove;
-    QList<QContact> localContacts = m_contactManager.contacts(syncTargetFilter, QList<QContactSortOrder>(), noRelationships);
-    for (int i = 0; i < localContacts.size(); ++i) {
-        const QContact &c(localContacts[i]);
-        if (c.detail<QContactGuid>().guid().startsWith(QStringLiteral("%1:").arg(oldId))) {
-            // it was provided by this account.  Remove this one.
-            contactsToRemove.append(c.id());
-            purgeCount++;
-        } else {
-            // it was always provided by some other account only.  Don't modify this one.
-        }
+    QContactCollectionId friendCollectionId = findCollection(*m_contactManager, FriendCollectionName, oldId).id();
+    if (friendCollectionId.isNull()) {
+        SOCIALD_LOG_ERROR("Nothing to purge, no collection has been saved for account" << oldId);
+        return;
     }
 
-    // now write the changes to the database.
-    bool success = true;
-    if (contactsToRemove.size()) {
-        success = m_contactManager.removeContacts(contactsToRemove);
-        if (!success) {
-            SOCIALD_LOG_ERROR("Failed to remove stale contacts during purge of account" << oldId << ":" << m_contactManager.error());
-        }
-    }
-
-    // ensure we remove the OOB data for the account.
-    // if we do not, restoring accounts from backup and then triggering sync could cause issues.
-    QStringList purgeKeys;
-    // purge the "build-in" OOB keys
-    purgeKeys << QStringLiteral("prevRemote") << QStringLiteral("exportedIds")
-              << QStringLiteral("remoteSince") << QStringLiteral("localSince")
-              << QStringLiteral("possiblyUploadedAdditions")
-              << QStringLiteral("definitelyDownloadedAdditions");
-    // purge the extra OOB keys
-    purgeKeys << QStringLiteral("contactIds")
-              << QStringLiteral("contactAvatars");
-
-    // we cannot use the oob scope cached in (d->m_stateData[QString::number(oldId)].m_oobScope
-    // here, as the state data is only initialized during sync, and thus is not available
-    // in cleanUp() codepath.
-    QString oobScope = QStringLiteral("%1-%2").arg(SOCIALD_VK_CONTACTS_SYNCTARGET).arg(oldId);
-    if (!d->m_engine->removeOOB(oobScope, purgeKeys)) {
-        success = false;
-        SOCIALD_LOG_ERROR("Error occurred while purging OOB data for removed VK account:" << oldId);
-    }
-
-    if (success) {
-        SOCIALD_LOG_INFO("Purged account" << oldId << "and successfully removed" << purgeCount << "contacts");
+    if (m_contactManager->removeCollection(friendCollectionId)) {
+        SOCIALD_LOG_INFO("purged account" << oldId << "and successfully removed collection" << friendCollectionId);
+    } else {
+        SOCIALD_LOG_ERROR("Failed to remove friends collection during purge of account" << oldId
+                          << ":" << m_contactManager->error());
     }
 }
 
@@ -282,11 +238,10 @@ void VKContactSyncAdaptor::retryThrottledRequest(const QString &request, const Q
     int accountId = args[0].toInt();
     if (retryLimitReached) {
         SOCIALD_LOG_ERROR("hit request retry limit! unable to request data from VK account with id" << accountId);
-        purgeSyncStateData(QString::number(accountId));
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
         SOCIALD_LOG_DEBUG("retrying Contacts" << request << "request for VK account:" << accountId);
-        requestData(accountId, args[1].toString(), args[2].toInt(), args[3].toDateTime());
+        requestData(accountId, args[1].toInt());
     }
     decrementSemaphore(accountId); // finished waiting for the request.
 }
@@ -294,32 +249,28 @@ void VKContactSyncAdaptor::retryThrottledRequest(const QString &request, const Q
 void VKContactSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
     // clear our cache lists if necessary.
-    m_localChanges[accountId].clear();
     m_remoteContacts[accountId].clear();
-    m_remoteAddMods[accountId].clear();
-    m_remoteDels[accountId].clear();
     m_accessTokens[accountId] = accessToken;
 
-    QDateTime remoteSince;
-    if (!initSyncAdapter(QString::number(accountId))
-            || !readSyncStateData(&remoteSince, QString::number(accountId))) {
+    VKContactSqliteSyncAdaptor *sqliteSync = m_sqliteSync.value(accountId);
+    if (sqliteSync) {
+        delete sqliteSync;
+    }
+    sqliteSync = new VKContactSqliteSyncAdaptor(accountId, this);
+    if (!sqliteSync->startSync()) {
+        sqliteSync->deleteLater();
         SOCIALD_LOG_ERROR("unable to init sync adapter - aborting sync VK contacts with account:" << accountId);
-        purgeSyncStateData(QString::number(accountId));
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
-    determineRemoteChanges(remoteSince, QString::number(accountId));
+    m_sqliteSync[accountId] = sqliteSync;
 }
 
-void VKContactSyncAdaptor::determineRemoteChanges(const QDateTime &remoteSince, const QString &accountId)
+void VKContactSyncAdaptor::requestData(int accountId, int startIndex)
 {
-    int accId = accountId.toInt();
-    requestData(accId, m_accessTokens[accId], 0, remoteSince);
-}
+    const QString accessToken = m_accessTokens[accountId];
 
-void VKContactSyncAdaptor::requestData(int accountId, const QString &accessToken, int startIndex, const QDateTime &syncTimestamp)
-{
     QUrl requestUrl;
     QUrlQuery urlQuery;
     requestUrl = QUrl(QStringLiteral("https://api.vk.com/method/friends.get"));
@@ -341,16 +292,18 @@ void VKContactSyncAdaptor::requestData(int accountId, const QString &accessToken
         reply->setProperty("accountId", accountId);
         reply->setProperty("accessToken", accessToken);
         reply->setProperty("startIndex", startIndex);
-        reply->setProperty("lastSyncTimestamp", syncTimestamp);
-        connect(reply, SIGNAL(finished()), this, SLOT(contactsFinishedHandler()));
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, &QNetworkReply::finished,
+                this, &VKContactSyncAdaptor::contactsFinishedHandler);
+        connect(reply, static_cast<void (QNetworkReply::*)(QNetworkReply::NetworkError)>(&QNetworkReply::error),
+                this, &VKContactSyncAdaptor::errorHandler);
+        connect(reply, &QNetworkReply::sslErrors,
+                this, &VKContactSyncAdaptor::sslErrorsHandler);
         m_apiRequestsRemaining[accountId] = m_apiRequestsRemaining[accountId] - 1;
         setupReplyTimeout(accountId, reply);
     } else {
         // request was throttled by VKNetworkAccessManager
         QVariantList args;
-        args << accountId << accessToken << startIndex << syncTimestamp;
+        args << accountId << startIndex;
         enqueueThrottledRequest(QStringLiteral("requestData"), args);
 
         // we are waiting to request data.  Increment the semaphore so that we know we're still busy.
@@ -387,13 +340,11 @@ void VKContactSyncAdaptor::contactsFinishedHandler()
             return;
         }
         SOCIALD_LOG_ERROR("error occurred when performing contacts request for VK account:" << accountId);
-        purgeSyncStateData(QString::number(accountId));
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
         return;
     } else if (data.isEmpty()) {
         SOCIALD_LOG_ERROR("no contact data in reply from VK with account:" << accountId);
-        purgeSyncStateData(QString::number(accountId));
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
         return;
@@ -411,189 +362,14 @@ void VKContactSyncAdaptor::contactsFinishedHandler()
     } else if (totalCount > seenCount) {
         SOCIALD_LOG_TRACE("Have received" << seenCount << "contacts, now requesting:" << (seenCount+1) << "through to" << (seenCount+1+SOCIALD_VK_MAX_CONTACT_ENTRY_RESULTS));
         startIndex = seenCount;
-        requestData(accountId, accessToken, startIndex, lastSyncTimestamp);
+        requestData(accountId, startIndex);
     } else {
-        // we're finished downloading the remote changes - we should sync local changes up.
-        continueSync(accountId, accessToken);
+        // We've finished downloading the remote changes
+        VKContactSqliteSyncAdaptor *sqliteSync = m_sqliteSync[accountId];
+        sqliteSync->remoteContactsDetermined(sqliteSync->m_collection, m_remoteContacts[accountId]);
     }
 
     decrementSemaphore(accountId);
-}
-
-void VKContactSyncAdaptor::continueSync(int accountId, const QString &accessToken)
-{
-    Q_UNUSED(accessToken) // maybe needed for avatar?
-
-    QContactDetailFilter syncTargetFilter;
-    syncTargetFilter.setDetailType(QContactDetail::TypeSyncTarget, QContactSyncTarget::FieldSyncTarget);
-    syncTargetFilter.setValue(SOCIALD_VK_CONTACTS_SYNCTARGET);
-
-    // now that we have all of the contacts received, we can determine
-    // whether any deletions have occurred, and also additions/modifications.
-    QList<QContact> adds, mods, dels;
-    QList<QContact> currentContacts = m_contactManager.contacts(syncTargetFilter);
-    for (int i = currentContacts.size() - 1; i >= 0; --i) {
-        if (!currentContacts[i].detail<QContactGuid>().guid().startsWith(QStringLiteral("%1:").arg(accountId))) {
-            // not from this account.
-            currentContacts.removeAt(i);
-        }
-    }
-
-    calculateRemoteDelta(m_remoteContacts[accountId], currentContacts, &adds, &mods, &dels);
-    SOCIALD_LOG_INFO("VK contact sync with account" << accountId <<
-                     "got remote changes: a:" << adds.size() << "m:" << mods.size() << "r:" << dels.size() <<
-                     "from:" << m_remoteContacts[accountId].size() << "total, with" << currentContacts.size() << "pre-existing.");
-
-    if (mods.count() > currentContacts.size()) {
-        // guid matching must have gone wrong (perhaps the id of contacts was parsed incorrectly).
-        SOCIALD_LOG_ERROR("delta calculation failed: have more mods than existing contacts.  Aborting!");
-        purgeSyncStateData(QString::number(accountId));
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        decrementSemaphore(accountId);
-        return;
-    }
-
-    for (int i = 0; i < adds.size(); ++i) {
-        QContact c = adds[i];
-        m_remoteAddMods[accountId].append(c);
-        SOCIALD_LOG_TRACE("have added contact:" <<
-                          c.detail<QContactName>().firstName() <<
-                          c.detail<QContactName>().lastName() <<
-                          c.detail<QContactDisplayLabel>().label());
-    }
-    for (int i = 0; i < mods.size(); ++i) {
-        QContact c = mods[i];
-        // we have to do this, because the id reported in the contact might have changed between syncs
-        // and the sync adapter contract requires that the id we set in it be the same as the id we
-        // got for it previously, rather than the current database state.
-        c.setId(QContactId::fromString(m_contactIds[accountId].value(c.detail<QContactGuid>().guid())));
-        m_remoteAddMods[accountId].append(c);
-        SOCIALD_LOG_TRACE("have modified contact:" <<
-                          c.detail<QContactName>().firstName() <<
-                          c.detail<QContactName>().lastName() <<
-                          c.detail<QContactDisplayLabel>().label());
-    }
-    for (int i = 0; i < dels.size(); ++i) {
-        QContact c = dels[i];
-        c.setId(QContactId::fromString(m_contactIds[accountId].value(c.detail<QContactGuid>().guid())));
-        m_contactAvatars[accountId].remove(c.detail<QContactGuid>().guid()); // just in case the avatar was outstanding.
-        m_remoteDels[accountId].append(c);
-        SOCIALD_LOG_TRACE("have removed contact:" <<
-                          c.detail<QContactName>().firstName() <<
-                          c.detail<QContactName>().lastName() <<
-                          c.detail<QContactDisplayLabel>().label());
-    }
-
-    // now store the changes locally
-    if (!storeRemoteChanges(m_remoteDels[accountId], &m_remoteAddMods[accountId], QString::number(accountId))) {
-        SOCIALD_LOG_ERROR("unable to store remote changes locally - aborting sync VK contacts for account" << accountId);
-        purgeSyncStateData(QString::number(accountId));
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        // note: don't decrement here - it's done by contactsFinishedHandler().
-        return;
-    }
-
-    // update our mapping of GUID to QContactId
-    foreach (const QContact &c, m_remoteAddMods[accountId]) {
-        if (c.id().toString().trimmed().isEmpty()) {
-            SOCIALD_LOG_ERROR("No local contact id specified for contact with guid" << c.detail<QContactGuid>().guid() <<
-                              "from account" << accountId);
-        } else {
-            m_contactIds[accountId].insert(c.detail<QContactGuid>().guid(), c.id().toString());
-        }
-    }
-
-    // now determine which local changes need to be upsynced to the remote server
-    QSet<QContactDetail::DetailType> ignorableDetailTypes;
-    // these are the "default" ignorable detail types from the TWCSA baseclass.
-    ignorableDetailTypes.insert(QContactDetail__TypeDeactivated);
-    ignorableDetailTypes.insert(QContactDetail::TypeDisplayLabel);
-    ignorableDetailTypes.insert(QContactDetail::TypeGlobalPresence);
-    ignorableDetailTypes.insert(QContactDetail__TypeIncidental);
-    ignorableDetailTypes.insert(QContactDetail::TypePresence);
-    ignorableDetailTypes.insert(QContactDetail::TypeOnlineAccount);
-    ignorableDetailTypes.insert(QContactDetail__TypeStatusFlags);
-    ignorableDetailTypes.insert(QContactDetail::TypeSyncTarget);
-    ignorableDetailTypes.insert(QContactDetail::TypeTimestamp);
-    // we add one detail type to the ignorable set: avatar, since we don't upsync avatar changes.
-    ignorableDetailTypes.insert(QContactAvatar::Type);
-    // fetch the local changes which occurred since last sync
-    QDateTime localSince;
-    QList<QContact> locallyAdded, locallyModified, locallyDeleted;
-    if (!determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted, QString::number(accountId), ignorableDetailTypes)) {
-        SOCIALD_LOG_ERROR("unable to determine local changes - aborting sync VK contacts for account" << accountId);
-        purgeSyncStateData(QString::number(accountId));
-        setStatus(SocialNetworkSyncAdaptor::Error);
-        // note: don't decrement here - it's done by contactsFinishedHandler().
-        return;
-    }
-
-    // now push those changes up to VK.
-    upsyncLocalChanges(localSince, locallyAdded, locallyModified, locallyDeleted, QString::number(accountId));
-}
-
-void VKContactSyncAdaptor::upsyncLocalChanges(const QDateTime &localSince,
-                                              const QList<QContact> &locallyAdded,
-                                              const QList<QContact> &locallyModified,
-                                              const QList<QContact> &locallyDeleted,
-                                              const QString &accountId)
-{
-    int accId = accountId.toInt();
-    QList<QPair<QContact, VKContactSyncAdaptor::UpdateType> > contactUpdatesToPost;
-    foreach (const QContact &c, locallyAdded)
-        contactUpdatesToPost.append(qMakePair(c, VKContactSyncAdaptor::Add));
-    foreach (const QContact &c, locallyModified)
-        contactUpdatesToPost.append(qMakePair(c, VKContactSyncAdaptor::Modify));
-    foreach (const QContact &c, locallyDeleted) {
-        contactUpdatesToPost.append(qMakePair(c, VKContactSyncAdaptor::Remove));
-        m_contactAvatars[accId].remove(c.detail<QContactGuid>().guid()); // just in case the avatar was outstanding.
-    }
-    m_localChanges[accId] = contactUpdatesToPost;
-
-    SOCIALD_LOG_INFO("VK account:" << accId <<
-                     "upsyncing local contact changes since:" << localSince.toString(Qt::ISODate) <<
-                     "-> local A/M/R:" << locallyAdded.count() << "/" << locallyModified.count() << "/" << locallyDeleted.count());
-
-    upsyncLocalChangesList(accId);
-}
-
-bool VKContactSyncAdaptor::testAccountProvenance(const QContact &contact, const QString &accountId)
-{
-    return contact.detail<QContactGuid>().guid().startsWith(QStringLiteral("%1:").arg(accountId));
-}
-
-void VKContactSyncAdaptor::upsyncLocalChangesList(int accountId)
-{
-    bool postedData = false;
-    if (!m_accountSyncProfile || m_accountSyncProfile->syncDirection() != Buteo::SyncProfile::SYNC_DIRECTION_FROM_REMOTE) {
-        // we don't yet support upsync
-        SOCIALD_LOG_INFO("upload of local contacts changes for VK account" << accountId << "not yet implemented");
-    } else {
-        SOCIALD_LOG_INFO("skipping upload of local contacts changes due to profile direction setting for account" << accountId);
-    }
-
-    if (!postedData) {
-        // nothing left to upsync.  attempt to download any outstanding avatars.
-        queueOutstandingAvatars(accountId, m_accessTokens[accountId]);
-    }
-}
-
-void VKContactSyncAdaptor::queueOutstandingAvatars(int accountId, const QString &accessToken)
-{
-    if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("sync aborted, skipping queuing avatars for contacts from VK account:" << accountId);
-        return;
-    }
-
-    int queuedCount = 0;
-    for (QMap<QString, QString>::const_iterator it = m_contactAvatars[accountId].constBegin();
-            it != m_contactAvatars[accountId].constEnd(); ++it) {
-        if (!it.value().isEmpty() && queueAvatarForDownload(accountId, accessToken, it.key(), it.value())) {
-            queuedCount++;
-        }
-    }
-
-    SOCIALD_LOG_DEBUG("queued" << queuedCount << "avatars for download for account" << accountId);
 }
 
 bool VKContactSyncAdaptor::queueAvatarForDownload(int accountId, const QString &accessToken, const QString &contactGuid, const QString &imageUrl)
@@ -615,11 +391,11 @@ bool VKContactSyncAdaptor::queueAvatarForDownload(int accountId, const QString &
     return false;
 }
 
-
 QList<QContact> VKContactSyncAdaptor::parseContacts(const QJsonArray &json, int accountId, const QString &accessToken)
 {
     QList<QContact> retn;
     QJsonArray::const_iterator it = json.constBegin();
+
     for ( ; it != json.constEnd(); ++it) {
         const QJsonObject &obj((*it).toObject());
         if (obj.isEmpty()) continue;
@@ -673,8 +449,7 @@ QList<QContact> VKContactSyncAdaptor::parseContacts(const QJsonArray &json, int 
             saveNonexportableDetail(c, nickname);
         }
 
-        if (!obj.value("photo_max").toString().isEmpty() &&
-                !obj.value("photo_max").toString().startsWith(QStringLiteral("http://vk.com/images/camera_"))) {
+        if (!obj.value("photo_max").toString().isEmpty()) {
             QContactAvatar avatar;
             avatar.setImageUrl(QUrl(obj.value("photo_max").toString()));
             avatar.setValue(QContactAvatar__FieldAvatarMetadata, QStringLiteral("picture"));
@@ -710,7 +485,7 @@ QList<QContact> VKContactSyncAdaptor::parseContacts(const QJsonArray &json, int 
         } else if (uidint > 0) {
             url.setUrl(QUrl(QStringLiteral("https://m.vk.com/id%1").arg(uidint)));
         }
-        url.setSubType(QContactUrl::SubTypeBlog);
+        url.setSubType(QContactUrl::SubTypeHomePage);
         saveNonexportableDetail(c, url);
 
         retn.append(c);
@@ -770,10 +545,8 @@ void VKContactSyncAdaptor::transformContactAvatars(QList<QContact> &remoteContac
 
                 if (!QFile::exists(localFileName)) {
                     // temporarily remove the avatar from the contact
-                    m_contactAvatars[accountId].insert(contactGuid, remoteImageUrl);
                     curr.removeDetail(&avatar);
                     // then trigger the download
-
                     queueAvatarForDownload(accountId, accessToken, contactGuid, remoteImageUrl);
                 }
             }
@@ -781,8 +554,7 @@ void VKContactSyncAdaptor::transformContactAvatars(QList<QContact> &remoteContac
     }
 }
 
-void VKContactSyncAdaptor::imageDownloaded(const QString &url, const QString &path,
-                                                     const QVariantMap &metadata)
+void VKContactSyncAdaptor::imageDownloaded(const QString &url, const QString &path, const QVariantMap &metadata)
 {
     Q_UNUSED(url)
 
@@ -793,7 +565,6 @@ void VKContactSyncAdaptor::imageDownloaded(const QString &url, const QString &pa
     // Empty path signifies that an error occurred.
     if (!path.isEmpty()) {
         // no longer outstanding.
-        m_contactAvatars[accountId].remove(contactGuid);
         m_queuedAvatarsForDownload[accountId].remove(contactGuid);
         m_downloadedContactAvatars[accountId].insert(contactGuid, path);
     }
@@ -801,74 +572,73 @@ void VKContactSyncAdaptor::imageDownloaded(const QString &url, const QString &pa
     decrementSemaphore(accountId);
 }
 
+void VKContactSyncAdaptor::deleteDownloadedAvatar(const QContact &contact)
+{
+    const QString contactGuid = contact.detail<QContactGuid>().guid();
+    if (contactGuid.isEmpty()) {
+        return;
+    }
+    const QContactAvatar avatar = contact.detail<QContactAvatar>();
+    if (avatar.isEmpty()) {
+        return;
+    }
+
+    const QString localFileName = VKContactImageDownloader::staticOutputFile(
+                contactGuid, avatar.imageUrl().toString());
+    if (!localFileName.isEmpty() && QFile::remove(localFileName)) {
+        SOCIALD_LOG_DEBUG("Removed avatar" << localFileName << "of deleted contact" << contact.id());
+    }
+}
+
 void VKContactSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
         SOCIALD_LOG_DEBUG("sync aborted, skipping finalize of VK contacts from account:" << accountId);
+        m_sqliteSync[accountId]->syncFinishedWithError();
     } else {
         SOCIALD_LOG_DEBUG("finalizing VK contacts sync with account:" << accountId);
         // first, ensure we update any avatars required.
         if (m_downloadedContactAvatars[accountId].size()) {
             // load all VK contacts from the database.  We need all details, to avoid clobber.
-            QContactDetailFilter syncTargetFilter;
-            syncTargetFilter.setDetailType(QContactDetail::TypeSyncTarget, QContactSyncTarget::FieldSyncTarget);
-            syncTargetFilter.setValue(SOCIALD_VK_CONTACTS_SYNCTARGET);
-            QList<QContact> VKContacts = m_contactManager.contacts(syncTargetFilter);
+            QContactCollectionFilter collectionFilter;
+            collectionFilter.setCollectionId(m_sqliteSync[accountId]->m_collection.id());
+            QList<QContact> VKContacts = m_contactManager->contacts(collectionFilter);
 
             // find the contacts we need to update.
-            QMap<QString, QContactAvatar> avatarsToSave;
             QMap<QString, QContact> contactsToSave;
-            for (QMap<QString, QString>::const_iterator it = m_downloadedContactAvatars[accountId].constBegin();
+            for (auto it = m_downloadedContactAvatars[accountId].constBegin();
                     it != m_downloadedContactAvatars[accountId].constEnd(); ++it) {
-                for (int i = 0; i < VKContacts.size(); ++i) {
-                    const QString &contactGuid(VKContacts[i].detail<QContactGuid>().guid());
-                    if (it.key() == contactGuid) {
-                        // we have downloaded the avatar for this contact, and need to update it.
-                        QContact c = VKContacts[i];
-                        QContactAvatar a;
-                        Q_FOREACH (const QContactAvatar &av, c.details<QContactAvatar>()) {
-                            if (av.value(QContactAvatar__FieldAvatarMetadata).toString() == QStringLiteral("picture")) {
-                                a = av;
-                                break;
-                            }
+                QContact c = findContact(VKContacts, it.key());
+                if (c.isEmpty()) {
+                    c = findContact(m_remoteContacts[accountId], it.key());
+                }
+                if (c.isEmpty()) {
+                    SOCIALD_LOG_ERROR("Not saving avatar, cannot find contact with guid" << it.key());
+                } else {
+                    // we have downloaded the avatar for this contact, and need to update it.
+                    QContactAvatar a;
+                    Q_FOREACH (const QContactAvatar &av, c.details<QContactAvatar>()) {
+                        if (av.value(QContactAvatar__FieldAvatarMetadata).toString() == QStringLiteral("picture")) {
+                            a = av;
+                            break;
                         }
-                        a.setValue(QContactAvatar__FieldAvatarMetadata, QVariant::fromValue<QString>(QStringLiteral("picture")));
-                        a.setImageUrl(it.value());
-                        saveNonexportableDetail(c, a);
-                        contactsToSave[contactGuid] = c;
-                        avatarsToSave[contactGuid] = a;
-                        break;
                     }
+                    a.setValue(QContactAvatar__FieldAvatarMetadata, QVariant::fromValue<QString>(QStringLiteral("picture")));
+                    a.setImageUrl(it.value());
+                    saveNonexportableDetail(c, a);
+                    contactsToSave[c.detail<QContactGuid>().guid()] = c;
                 }
             }
 
             QList<QContact> saveList = contactsToSave.values();
-            if (m_contactManager.saveContacts(&saveList)) {
+            if (m_contactManager->saveContacts(&saveList)) {
                 SOCIALD_LOG_INFO("finalize: added avatars for" << saveList.size() << "VK contacts from account" << accountId);
-
-                // update our mutated prev remote versions with the added avatar detail.
-                foreach (const QContact &c, saveList) {
-                    const QString &contactGuid(c.detail<QContactGuid>().guid());
-                    for (int i = 0; i < d->m_stateData[QString::number(accountId)].m_mutatedPrevRemote.size(); ++i) {
-                        if (contactGuid == d->m_stateData[QString::number(accountId)].m_mutatedPrevRemote[i].detail<QContactGuid>().guid()) {
-                            QContact mprc = d->m_stateData[QString::number(accountId)].m_mutatedPrevRemote[i];
-                            QContactAvatar avatar = avatarsToSave[contactGuid];
-                            saveNonexportableDetail(mprc, avatar);
-                            d->m_stateData[QString::number(accountId)].m_mutatedPrevRemote.replace(i, mprc);
-                            break;
-                        }
-                    }
-                }
             } else {
                 SOCIALD_LOG_ERROR("finalize: error adding avatars for" << saveList.size() << "VK contacts from account" << accountId);
             }
         }
 
-        if (!storeSyncStateData(QString::number(accountId))) {
-            SOCIALD_LOG_ERROR("unable to finalize sync of VK contacts with account" << accountId);
-            purgeSyncStateData(QString::number(accountId));
-            setStatus(SocialNetworkSyncAdaptor::Error);
-        }
+        m_sqliteSync[accountId]->syncFinishedSuccessfully();
     }
 }
 
@@ -898,28 +668,26 @@ void VKContactSyncAdaptor::finalCleanup()
     }
 
     // second, get all contacts which have been synced from VK.
-    QContactDetailFilter syncTargetFilter;
-    syncTargetFilter.setDetailType(QContactDetail::TypeSyncTarget, QContactSyncTarget::FieldSyncTarget);
-    syncTargetFilter.setValue(SOCIALD_VK_CONTACTS_SYNCTARGET);
-    QContactFetchHint noRelationships;
-    noRelationships.setOptimizationHints(QContactFetchHint::NoRelationships);
-    noRelationships.setDetailTypesHint(QList<QContactDetail::DetailType>() << QContactGuid::Type << QContactAvatar::Type);
-    QList<QContact> VKContacts = m_contactManager.contacts(syncTargetFilter, QList<QContactSortOrder>(), noRelationships);
+    QList<QContact> VKContacts;
+    for (auto it = m_sqliteSync.begin(); it != m_sqliteSync.end(); ++it) {
+        QContactCollectionFilter collectionFilter;
+        collectionFilter.setCollectionId(it.value()->m_collection.id());
+        QContactFetchHint noRelationships;
+        noRelationships.setOptimizationHints(QContactFetchHint::NoRelationships);
+        noRelationships.setDetailTypesHint(QList<QContactDetail::DetailType>() << QContactGuid::Type << QContactAvatar::Type);
+        VKContacts.append(m_contactManager->contacts(collectionFilter, QList<QContactSortOrder>(), noRelationships));
+    }
 
     // third, find all account ids from which contacts have been synced
-    foreach (const QContact &contact, VKContacts) {
-        QContactGuid guid = contact.detail<QContactGuid>();
-        QStringList guidParts = guid.guid().split(":");
-        QString accountIdStr = guidParts.size() ? guidParts.first() : QString();
-        if (!accountIdStr.isEmpty()) {
-            int purgeId = accountIdStr.toInt();
+    const QList<QContactCollection> collections = m_contactManager->collections();
+    for (const QContactCollection &collection : collections) {
+        if (collection.metaData(QContactCollection::KeyName).toString() == FriendCollectionName) {
+            const int purgeId = collection.extendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_ACCOUNTID).toInt();
             if (purgeId && !VKAccountIds.contains(purgeId)
                     && !purgeAccountIds.contains(purgeId)) {
                 // this account no longer exists, and needs to be purged.
                 purgeAccountIds.append(purgeId);
             }
-        } else {
-            qWarning() << Q_FUNC_INFO << "Malformed GUID not of form <accountId>:<remoteGuid>";
         }
     }
 
@@ -956,7 +724,7 @@ void VKContactSyncAdaptor::finalCleanup()
     }
 
     QList<QContact> saveList = contactsToSave.values();
-    if (m_contactManager.saveContacts(&saveList)) {
+    if (m_contactManager->saveContacts(&saveList)) {
         SOCIALD_LOG_INFO("finalCleanup() fixed up avatars from" << saveList.size() << "VK contacts");
     } else {
         SOCIALD_LOG_ERROR("finalCleanup() failed to save non-existent avatar removals for VK contacts");
@@ -965,112 +733,11 @@ void VKContactSyncAdaptor::finalCleanup()
     // fifth, purge all data for those account ids which no longer exist.
     if (purgeAccountIds.size()) {
         SOCIALD_LOG_INFO("finalCleanup() purging contacts from" << purgeAccountIds.size() << "non-existent VK accounts");
-        foreach (int purgeId, purgeAccountIds) {
+        for (int purgeId : purgeAccountIds) {
             purgeDataForOldAccount(purgeId, SocialNetworkSyncAdaptor::SyncPurge);
         }
     }
-}
 
-bool VKContactSyncAdaptor::readSyncStateData(QDateTime *remoteSince, const QString &accountId, TwoWayContactSyncAdapter::ReadStateMode readMode)
-{
-    // read the standard state data
-    if (!TwoWayContactSyncAdapter::readSyncStateData(remoteSince, accountId, readMode)) {
-        SOCIALD_LOG_ERROR("failed to read standard state data for VK account" << accountId);
-        return false;
-    }
-
-    bool ok = false;
-    int accId = accountId.toInt(&ok);
-    if (accId == 0 || !ok) {
-        SOCIALD_LOG_ERROR("invalid account id specified to readSyncStateData:" << accountId);
-        return false;
-    }
-
-    // then read the extra state data which is specific to this sync adapter.
-    QMap<QString, QVariant> values;
-    QStringList keys;
-    keys << QStringLiteral("contactIds")
-         << QStringLiteral("contactAvatars");
-    if (!d->m_engine->fetchOOB(d->m_stateData[accountId].m_oobScope, keys, &values)) {
-        SOCIALD_LOG_ERROR("failed to read extra data for VK account" << accountId);
-        d->clear(accountId);
-        return false;
-    }
-
-    // m_contactIds
-    QVariant ciValue = values.value(QStringLiteral("contactIds"));
-    QByteArray ciValueBA = ciValue.toByteArray();
-    QJsonObject ciJsonObj = QJsonDocument::fromBinaryData(ciValueBA).object();
-    QStringList contactGuids = ciJsonObj.keys();
-    QMap<QString, QString> guidToContactId;
-    foreach (const QString &guid, contactGuids) {
-        guidToContactId.insert(guid, ciJsonObj.value(guid).toString());
-    }
-    m_contactIds[accId] = guidToContactId;
-
-    // m_contactAvatars
-    QVariant caValue = values.value(QStringLiteral("contactAvatars"));
-    QByteArray caValueBA = caValue.toByteArray();
-    QJsonObject caJsonObj = QJsonDocument::fromBinaryData(caValueBA).object();
-    contactGuids = caJsonObj.keys();
-    QMap<QString, QString> guidToContactAvatar;
-    foreach (const QString &guid, contactGuids) {
-        guidToContactAvatar.insert(guid, caJsonObj.value(guid).toString());
-    }
-    m_contactAvatars[accId] = guidToContactAvatar;
-    SOCIALD_LOG_INFO("have" << guidToContactAvatar.size() << "outstanding contact avatars to sync from account" << accountId);
-
-    // done.
-    return true;
-}
-
-bool VKContactSyncAdaptor::storeSyncStateData(const QString &accountId)
-{
-    bool ok = false;
-    int accId = accountId.toInt(&ok);
-    if (accId == 0 || !ok) {
-        SOCIALD_LOG_ERROR("invalid account id specified to storeSyncStateData:" << accountId);
-        return false;
-    }
-
-    // m_contactIds
-    QJsonObject ciJsonObj;
-    for (QMap<QString, QString>::const_iterator it = m_contactIds[accId].constBegin();
-            it != m_contactIds[accId].constEnd(); ++it) {
-        ciJsonObj.insert(it.key(), QJsonValue(it.value()));
-    }
-    QJsonDocument ciJsonDoc(ciJsonObj);
-    QVariant ciValue(ciJsonDoc.toBinaryData());
-
-    // m_contactAvatars
-    QJsonObject caJsonObj;
-    for (QMap<QString, QString>::const_iterator it = m_contactAvatars[accId].constBegin();
-            it != m_contactAvatars[accId].constEnd(); ++it) {
-        caJsonObj.insert(it.key(), QJsonValue(it.value()));
-    }
-    QJsonDocument caJsonDoc(caJsonObj);
-    QVariant caValue(caJsonDoc.toBinaryData());
-
-    // store to OOB
-    QMap<QString, QVariant> values;
-    values.insert("contactIds", ciValue);
-    values.insert("contactAvatars", caValue);
-    if (!d->m_engine->storeOOB(d->m_stateData[accountId].m_oobScope, values)) {
-        SOCIALD_LOG_ERROR("failed to store extra state data for VK account:" << accId);
-        d->clear(accountId);
-        return false;
-    }
-
-    return TwoWayContactSyncAdapter::storeSyncStateData(accountId);
-}
-
-bool VKContactSyncAdaptor::purgeSyncStateData(const QString &accountId, bool purgePartialSyncStateData)
-{
-    QStringList purgeKeys;
-    purgeKeys << QStringLiteral("contactIds")
-              << QStringLiteral("contactAvatars");
-    QString oobScope = d->m_stateData[accountId].m_oobScope;
-    bool extraPurgeSuccess = d->m_engine->removeOOB(oobScope, purgeKeys);
-    bool normalPurgeSuccess = TwoWayContactSyncAdapter::purgeSyncStateData(accountId, purgePartialSyncStateData);
-    return extraPurgeSuccess && normalPurgeSuccess;
+    qDeleteAll(m_sqliteSync.values());
+    m_sqliteSync.clear();
 }

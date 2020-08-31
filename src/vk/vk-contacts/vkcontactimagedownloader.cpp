@@ -7,13 +7,10 @@
 
 #include "vkcontactimagedownloader.h"
 
-#include <QUrl>
-#include <QUrlQuery>
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QNetworkAccessManager>
 
-static const char *IMAGE_DOWNLOADER_TOKEN_KEY = "token";
 static const char *IMAGE_DOWNLOADER_IDENTIFIER_KEY = "identifier";
 
 VKContactImageDownloader::VKContactImageDownloader()
@@ -31,14 +28,9 @@ QNetworkReply * VKContactImageDownloader::createReply(const QString &url,
 {
     Q_D(AbstractImageDownloader);
 
-    // XXX TODO: this might not be needed.
-    QString accessToken = metadata.value(IMAGE_DOWNLOADER_TOKEN_KEY).toString();
-    QUrl requestUrl(url);
-    QUrlQuery urlQuery;
-    urlQuery.addQueryItem("access_token", accessToken);
-    requestUrl.setQuery(urlQuery);
+    Q_UNUSED(metadata)
 
-    QNetworkRequest request(requestUrl);
+    QNetworkRequest request(url);
     return d->networkAccessManager->get(request);
 }
 

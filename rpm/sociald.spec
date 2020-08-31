@@ -341,7 +341,6 @@ Requires: %{name} = %{version}-%{release}
 %{summary}.
 
 %files vk-posts
-#%{_datadir}/translations/lipstick-jolla-home-vk_eng_en.qm
 #out-of-process-plugin form:
 %{_libdir}/buteo-plugins-qt5/oopp/vk-posts-client
 #in-process-plugin form:
