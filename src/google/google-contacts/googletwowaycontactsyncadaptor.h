@@ -1,7 +1,7 @@
 /****************************************************************************
  **
- ** Copyright (C) 2014 Jolla Ltd.
- ** Contact: Chris Adams <chris.adams@jollamobile.com>
+ ** Copyright (c) 2014 - 2019 Jolla Ltd.
+ ** Copyright (c) 2020 Open Mobile Platform LLC.
  **
  ** This program/library is free software; you can redistribute it and/or
  ** modify it under the terms of the GNU Lesser General Public License
@@ -25,7 +25,7 @@
 #include "googledatatypesyncadaptor.h"
 #include "googlecontactstream.h"
 
-#include <twowaycontactsyncadapter.h>
+#include <twowaycontactsyncadaptor.h>
 
 #include <QContactManager>
 #include <QContact>
@@ -36,26 +36,84 @@
 QTCONTACTS_USE_NAMESPACE
 
 class GoogleContactImageDownloader;
-class GoogleTwoWayContactSyncAdaptor : public GoogleDataTypeSyncAdaptor, public QtContactsSqliteExtensions::TwoWayContactSyncAdapter
+class GoogleTwoWayContactSyncAdaptor;
+
+class GoogleContactSqliteSyncAdaptor : public QObject, public QtContactsSqliteExtensions::TwoWayContactSyncAdaptor
 {
     Q_OBJECT
-
 public:
+    GoogleContactSqliteSyncAdaptor(int accountId, GoogleTwoWayContactSyncAdaptor *parent);
+   ~GoogleContactSqliteSyncAdaptor();
+
+    int accountId() const;
+
+    virtual bool determineRemoteCollections() override;
+    virtual bool deleteRemoteCollection(const QContactCollection &collection) override;
+    virtual bool determineRemoteContacts(const QContactCollection &collection) override;
+
+    virtual bool determineRemoteContactChanges(const QContactCollection &collection,
+                                               const QList<QContact> &localAddedContacts,
+                                               const QList<QContact> &localModifiedContacts,
+                                               const QList<QContact> &localDeletedContacts,
+                                               const QList<QContact> &localUnmodifiedContacts,
+                                               QContactManager::Error *error) override;
+
+    virtual bool storeLocalChangesRemotely(const QContactCollection &collection,
+                                           const QList<QContact> &addedContacts,
+                                           const QList<QContact> &modifiedContacts,
+                                           const QList<QContact> &deletedContacts) override;
+    virtual void storeRemoteChangesLocally(const QContactCollection &collection,
+                                           const QList<QContact> &addedContacts,
+                                           const QList<QContact> &modifiedContacts,
+                                           const QList<QContact> &deletedContacts) override;
+
+    virtual void syncFinishedSuccessfully() override;
+    virtual void syncFinishedWithError() override;
+
+    QContactCollection m_collection;
+
+private:
+    GoogleTwoWayContactSyncAdaptor *q;
+    int m_accountId = 0;
+};
+
+class GoogleTwoWayContactSyncAdaptor : public GoogleDataTypeSyncAdaptor
+{
+    Q_OBJECT
+public:
+    enum DataRequestType {
+        ContactRequest,
+        ContactGroupRequest
+    };
+
+    enum ContactChangeNotifier {
+        NoContactChangeNotifier,
+        DetermineRemoteContacts,
+        DetermineRemoteContactChanges
+    };
+    Q_ENUM(ContactChangeNotifier)
+
     GoogleTwoWayContactSyncAdaptor(QObject *parent);
    ~GoogleTwoWayContactSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId = 0);
+    virtual QString syncServiceName() const override;
+    virtual void sync(const QString &dataTypeString, int accountId) override;
 
-protected:
-    // implementing the TWCSA interface
-    void determineRemoteChanges(const QDateTime &remoteSince,
-                                const QString &accountId);
+    void requestData(int accountId,
+                     int startIndex,
+                     const QString &continuationRequest,
+                     const QDateTime &syncTimestamp,
+                     DataRequestType requestType,
+                     ContactChangeNotifier contactChangeNotifier = NoContactChangeNotifier);
     void upsyncLocalChanges(const QDateTime &localSince,
                             const QList<QContact> &locallyAdded,
                             const QList<QContact> &locallyModified,
                             const QList<QContact> &locallyDeleted,
-                            const QString &accountId);
+                            int accountId);
+
+    void storeSyncStateData(QContactCollection *collection);
+
+    QContactManager *m_contactManager = nullptr;
 
 protected:
     // implementing GoogleDataTypeSyncAdaptor interface
@@ -63,29 +121,24 @@ protected:
     void beginSync(int accountId, const QString &accessToken);
     void finalize(int accountId);
     void finalCleanup();
-    // implementing TWCSA interface
-    bool testAccountProvenance(const QContact &contact, const QString &accountIdStr);
-    bool readSyncStateData(QDateTime *remoteSince, const QString &accountIdStr, TwoWayContactSyncAdapter::ReadStateMode readMode = TwoWayContactSyncAdapter::ReadAllState);
-    bool storeSyncStateData(const QString &accountIdStr);
-    bool purgeSyncStateData(const QString &accountIdStr, bool purgePartialSyncStateData = false);
 
 private:
-    void requestData(int accountId,
-                     const QString &accessToken,
-                     int startIndex = 0,
-                     const QString &continuationRequest = QString(),
-                     const QDateTime &syncTimestamp = QDateTime(),
-                     bool isGroupRequest = false);
-    void purgeAccount(int pid);
+    class BatchedUpdate
+    {
+    public:
+        QMultiMap<GoogleContactStream::UpdateType, QPair<QContact, QStringList> > batch;
+        int batchCount = 0;
+    };
 
-private Q_SLOTS:
+    void determineRemoteChanges(const QDateTime &remoteSince, int accountId);
     void groupsFinishedHandler();
     void contactsFinishedHandler();
-    void imageDownloaded(const QString &url, const QString &path, const QVariantMap &metadata);
-
-private:
-    void continueSync(int accountId, const QString &accessToken);
+    void continueSync(int accountId,
+                      const QString &accessToken,
+                      GoogleTwoWayContactSyncAdaptor::ContactChangeNotifier contactChangeNotifier);
     void upsyncLocalChangesList(int accountId);
+    bool batchRemoteChanges(int accountId, BatchedUpdate *batchedUpdate,
+                            QList<QContact> *contacts, GoogleContactStream::UpdateType updateType);
     void storeToRemote(int accountId,
                        const QString &accessToken,
                        const QByteArray &encodedContactUpdates);
@@ -93,32 +146,37 @@ private:
     bool queueAvatarForDownload(int accountId, const QString &accessToken, const QString &contactGuid, const QString &imageUrl);
     void transformContactAvatars(QList<QContact> &remoteContacts, int accountId, const QString &accessToken);
     void downloadContactAvatarImage(int accountId, const QString &accessToken, const QUrl &imageUrl, const QString &filename);
+    void imageDownloaded(const QString &url, const QString &path, const QVariantMap &metadata);
 
-private Q_SLOTS:
+    void readSyncStateData(const QContactCollection &collection);
+
+    void purgeAccount(int pid);
     void postFinishedHandler();
     void postErrorHandler();
 
-private:
-    QContactManager m_contactManager;
-    GoogleContactImageDownloader *m_workerObject;
+    GoogleContactImageDownloader *m_workerObject = nullptr;
 
+    QMap<int, GoogleContactSqliteSyncAdaptor *> m_sqliteSync;
     QMap<int, QString> m_accessTokens;
     QMap<int, QString> m_emailAddresses;
-    QMap<int, QString> m_myContactsGroupAtomIds;
+
+    QMap<int, QList<QContact> > m_remoteAdds;
+    QMap<int, QList<QContact> > m_remoteMods;
     QMap<int, QList<QContact> > m_remoteDels;
-    QMap<int, QList<QContact> > m_remoteAddMods;
+    QMap<int, QList<QContact> > m_localAdds;
+    QMap<int, QList<QContact> > m_localMods;
+    QMap<int, QList<QContact> > m_localDels;
+
     QMap<int, QMap<QString, QStringList> > m_unsupportedXmlElements; // contact guid -> elements
     QMap<int, QMap<QString, QString> > m_contactEtags; // contact guid -> contact etag
     QMap<int, QMap<QString, QString> > m_contactIds; // contact guid -> contact id
     QMap<int, QMap<QString, QString> > m_contactAvatars; // contact guid -> remote avatar path
-    QMap<int, QList<QPair<QContact, GoogleContactStream::UpdateType> > > m_localChanges;
 
-    // the following are not preserved across sync runs via OOB.
     QMap<int, int> m_apiRequestsRemaining;
     QMap<int, QMap<QString, QString> > m_queuedAvatarsForDownload; // contact guid -> remote avatar path
     QMap<int, QMap<QString, QString> > m_downloadedContactAvatars; // contact guid -> local file path
 
-    bool m_allowFinalCleanup;
+    bool m_allowFinalCleanup = false;
 };
 
 #endif // GOOGLETWOWAYCONTACTSYNCADAPTOR_H
