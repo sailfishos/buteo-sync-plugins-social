@@ -77,7 +77,7 @@ public slots:
 protected slots:
     void syncSucceeded();
 
-    void syncFailed(int errorCode);
+    void syncFailed();
 
 private:
     Buteo::SyncResults m_results;

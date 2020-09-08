@@ -23,53 +23,47 @@
 #define KNOWNCONTACTS_SYNCER_H
 
 #include <QContact>
-#include <QDateTime>
-#include <QObject>
-#include <QList>
+#include <QContactCollection>
+
+#include <QHash>
 #include <QSettings>
-#include <QString>
-#include <SyncProfile.h>
-#include <twowaycontactsyncadapter.h>
+
+#include <twowaycontactsyncadaptor.h>
 
 QTCONTACTS_USE_NAMESPACE
 
-class KnownContactsSyncer : public QObject, public QtContactsSqliteExtensions::TwoWayContactSyncAdapter
+class KnownContactsSyncer : public QObject, public QtContactsSqliteExtensions::TwoWayContactSyncAdaptor
 {
     Q_OBJECT
 
 public:
     KnownContactsSyncer(QString path, QObject *parent = nullptr);
-
     ~KnownContactsSyncer();
-
-    bool startSync();
 
     bool purgeData();
 
-    enum Failure : int {
-        NoFailure = 0, // Reserved as success value
-        InitFailure,
-        CallFailure,
-        StoreChangesFailure,
-        StoreStateFailure
-    };
-    Q_ENUM(Failure)
+    virtual bool determineRemoteCollections() override;
+    virtual bool deleteRemoteCollection(const QContactCollection &collection) override;
+    virtual bool determineRemoteContacts(const QContactCollection &collection) override;
+    virtual bool storeLocalChangesRemotely(const QContactCollection &collection,
+                                           const QList<QContact> &addedContacts,
+                                           const QList<QContact> &modifiedContacts,
+                                           const QList<QContact> &deletedContacts) override;
+    virtual void storeRemoteChangesLocally(const QContactCollection &collection,
+                                           const QList<QContact> &addedContacts,
+                                           const QList<QContact> &modifiedContacts,
+                                           const QList<QContact> &deletedContacts) override;
+    virtual void syncFinishedSuccessfully() override;
+    virtual void syncFinishedWithError() override;
 
 signals:
     void syncSucceeded();
-    void syncFailed(Failure errorCode);
-
-protected:
-    void determineRemoteChanges(const QDateTime &remoteSince);
-
-private slots:
-    void asyncDeterminedRemoteChanges(const QStringList files);
+    void syncFailed();
 
 private:
-    QContact getContact(const QString &id);
-    void handleSyncFailure(Failure error);
-    QList<QContact> readContacts(QSettings &file);
+    void readContacts(QSettings *file, QHash<QString, QContact> *contacts);
 
+    QContactCollection m_collection;
     QString m_syncFolder;
 };
 

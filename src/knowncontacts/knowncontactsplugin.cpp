@@ -159,14 +159,15 @@ void KnownContactsPlugin::syncSucceeded()
     emit success(getProfileName(), QStringLiteral("Success"));
 }
 
-void KnownContactsPlugin::syncFailed(int errorCode)
+void KnownContactsPlugin::syncFailed()
 {
     FUNCTION_CALL_TRACE;
 
-    LOG_DEBUG("Sync failed: " << errorCode);
+    LOG_DEBUG("Sync failed");
     m_results = Buteo::SyncResults(iProfile.lastSuccessfulSyncTime(),
-                                   Buteo::SyncResults::SYNC_RESULT_FAILED, errorCode);
-    emit error(getProfileName(), QStringLiteral("Failure"), errorCode);
+                                   Buteo::SyncResults::SYNC_RESULT_FAILED,
+                                   Buteo::SyncResults::INTERNAL_ERROR);
+    emit error(getProfileName(), QStringLiteral("Failure"), Buteo::SyncResults::INTERNAL_ERROR);
 }
 
 /**

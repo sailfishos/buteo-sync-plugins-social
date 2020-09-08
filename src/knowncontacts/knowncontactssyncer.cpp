@@ -20,19 +20,31 @@
  */
 
 #include <buteosyncfw5/LogMacros.h>
+
 #include <QContactEmailAddress>
 #include <QContactNickname>
 #include <QContactOrganization>
+#include <QContactCollectionFilter>
+
 #include <QDir>
 #include <QLockFile>
 #include <QStandardPaths>
+#include <QDebug>
+
 #include <qtcontacts-extensions_manager_impl.h>
-#include <twowaycontactsyncadapter_impl.h>
+#include <twowaycontactsyncadaptor_impl.h>
+#include <qcontactstatusflags_impl.h>
 
 #include "knowncontactssyncer.h"
 
-const auto KnownContactsSyncTarget = QLatin1String("knowncontacts");
-const auto AccountId = QLatin1String("0");
+/*
+  This performs a one-way sync to read contacts from a specified .ini file and write them to the
+  contacts database. The .ini files are populated from a GAL address book linked to ActiveSync
+  Exchange accounts.
+*/
+
+const auto KnownContactsCollectionName = QLatin1String("knowncontacts");
+const auto CollectionKeyLastSync = QLatin1String("last-sync-time");
 
 static void setGuid(QContact *contact, const QString &id);
 static void setNames(QContact *contact, const QSettings &file);
@@ -40,12 +52,49 @@ static void setPhoneNumbers(QContact *contact, const QSettings &file);
 static void setEmailAddress(QContact *contact, const QSettings &file);
 static void setCompanyInfo(QContact *contact, const QSettings &file);
 
+namespace {
+
+QContactCollection findCollection(const QContactManager &contactManager, const QString &name)
+{
+    const QList<QContactCollection> collections = contactManager.collections();
+    for (const QContactCollection &collection : collections) {
+        if (collection.metaData(QContactCollection::KeyName).toString() == name) {
+            return collection;
+        }
+    }
+    return QContactCollection();
+}
+
+QMap<QString, QString> managerParameters()
+{
+    QMap<QString, QString> rv;
+    // Report presence changes independently from other contact changes
+    rv.insert(QString::fromLatin1("mergePresenceChanges"), QString::fromLatin1("false"));
+    return rv;
+}
+
+}
+
 KnownContactsSyncer::KnownContactsSyncer(QString path, QObject *parent)
     : QObject(parent)
-    , QtContactsSqliteExtensions::TwoWayContactSyncAdapter(KnownContactsSyncTarget)
+    , QtContactsSqliteExtensions::TwoWayContactSyncAdaptor(0, qAppName(), managerParameters())
     , m_syncFolder(path)
 {
     FUNCTION_CALL_TRACE;
+
+    m_collection = findCollection(contactManager(), KnownContactsCollectionName);
+    if (m_collection.id().isNull()) {
+        LOG_DEBUG("No KnownContacts collection saved yet");
+
+        m_collection.setMetaData(QContactCollection::KeyName, KnownContactsCollectionName);
+        m_collection.setMetaData(QContactCollection::KeyDescription, QStringLiteral("EAS GAL contacts"));
+        m_collection.setMetaData(QContactCollection::KeyColor, QStringLiteral("yellow"));
+        m_collection.setMetaData(QContactCollection::KeySecondaryColor, QStringLiteral("lightyellow"));
+        m_collection.setExtendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_APPLICATIONNAME, QCoreApplication::applicationName());
+        m_collection.setExtendedMetaData(QStringLiteral("ReadOnly"), true);
+    } else {
+        LOG_DEBUG("Found KnownContacts collection:" << m_collection.id());
+    }
 }
 
 KnownContactsSyncer::~KnownContactsSyncer()
@@ -53,65 +102,50 @@ KnownContactsSyncer::~KnownContactsSyncer()
     FUNCTION_CALL_TRACE;
 }
 
-bool KnownContactsSyncer::startSync()
+bool KnownContactsSyncer::determineRemoteCollections()
 {
-    FUNCTION_CALL_TRACE;
-
-    QDateTime remoteSince;
-    if (!initSyncAdapter(AccountId, KnownContactsSyncTarget)
-            || !readSyncStateData(&remoteSince, AccountId)) {
-        handleSyncFailure(InitFailure);
-        LOG_WARNING("Can not sync knowncontacts");
-        return false;
-    }
-
-    determineRemoteChanges(remoteSince);
+    remoteCollectionsDetermined(QList<QContactCollection>() << m_collection);
     return true;
 }
 
-void KnownContactsSyncer::determineRemoteChanges(const QDateTime &remoteSince)
+bool KnownContactsSyncer::deleteRemoteCollection(const QContactCollection &collection)
 {
-    FUNCTION_CALL_TRACE;
+    Q_UNUSED(collection)
 
-    QDir syncDir(m_syncFolder);
-    QStringList files;
-    for (const auto &file : syncDir.entryList(QStringList() << "*.ini", QDir::Files)) {
-        QFileInfo info(syncDir, file);
-        if (info.lastModified() >= remoteSince)
-            files.append(info.absoluteFilePath());
-    }
-    LOG_DEBUG(files.size() << "files to sync");
-    if (!QMetaObject::invokeMethod(this, "asyncDeterminedRemoteChanges",
-                                   Qt::QueuedConnection,
-                                   Q_ARG(const QStringList, files))) {
-        handleSyncFailure(CallFailure);
-    }
+    LOG_WARNING("Collection deletion not supported, ignoring request to delete collection" << collection.id());
+    return true;
 }
 
-void KnownContactsSyncer::asyncDeterminedRemoteChanges(const QStringList files)
+bool KnownContactsSyncer::determineRemoteContacts(const QContactCollection &collection)
 {
     FUNCTION_CALL_TRACE;
 
-    QList<QContact> contacts;
-    for (const auto &path : files) {
-        QSettings file(path, QSettings::IniFormat);
-            contacts.append(readContacts(file));
-    }
-    LOG_DEBUG(contacts.size() << "contacts to store");
-    if (!storeRemoteChanges(QList<QContact>(), &contacts, AccountId)) {
-        handleSyncFailure(StoreChangesFailure);
-        return;
+    const QDateTime remoteSince = collection.extendedMetaData(CollectionKeyLastSync).toDateTime();
+    QDir syncDir(m_syncFolder);
+
+    QContactCollectionFilter collectionFilter;
+    collectionFilter.setCollectionId(collection.id());
+    QContactFetchHint noRelationships;
+    noRelationships.setOptimizationHints(QContactFetchHint::NoRelationships);
+    const QList<QContact> existingContacts = contactManager().contacts(collectionFilter, QList<QContactSortOrder>(), noRelationships);
+    LOG_DEBUG("Found" << existingContacts.size() << "existing contacts");
+
+    QHash<QString, QContact> existingContactsHash;
+    for (const QContact &contact : existingContacts) {
+        existingContactsHash.insert(contact.detail<QContactGuid>().guid(), contact);
     }
 
-    QDateTime localSince;
-    QList<QContact> locallyAdded, locallyModified, locallyDeleted;
-    determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted, AccountId);
-    if (!storeSyncStateData(AccountId)) {
-        handleSyncFailure(StoreStateFailure);
-        return;
+    const QStringList files = syncDir.entryList(QStringList() << "*.ini", QDir::Files);
+    for (const auto &file : files) {
+        QFileInfo info(syncDir, file);
+        if (info.lastModified() >= remoteSince) {
+            QSettings settings(info.absoluteFilePath(), QSettings::IniFormat);
+            readContacts(&settings, &existingContactsHash);
+        }
     }
 
-    for (const auto &path : files) {
+    for (const auto &file : files) {
+        const QString path = syncDir.absoluteFilePath(file);
         if (!QLockFile(path + QStringLiteral(".lock")).tryLock()) {
             LOG_DEBUG("File in use, not removing" << path);
         } else if (!QFile::remove(path)) {
@@ -119,8 +153,38 @@ void KnownContactsSyncer::asyncDeterminedRemoteChanges(const QStringList files)
         }
     }
 
-    LOG_DEBUG("knowncontacts sync finished successfully");
-    emit syncSucceeded();
+    const QList<QContact> updatedContacts = existingContactsHash.values();
+    LOG_DEBUG("Reporting" << updatedContacts.size() << "contacts in total");
+
+    remoteContactsDetermined(collection, updatedContacts);
+    return true;
+}
+
+bool KnownContactsSyncer::storeLocalChangesRemotely(const QContactCollection &collection,
+                                                    const QList<QContact> &addedContacts,
+                                                    const QList<QContact> &modifiedContacts,
+                                                    const QList<QContact> &deletedContacts)
+{
+    Q_UNUSED(collection)
+    Q_UNUSED(addedContacts)
+    Q_UNUSED(modifiedContacts)
+    Q_UNUSED(deletedContacts)
+
+    LOG_DEBUG("Sync is one-way, ignoring remote changes for" << collection.id());
+    return true;
+}
+
+
+void KnownContactsSyncer::storeRemoteChangesLocally(const QContactCollection &collection,
+                                                    const QList<QContact> &addedContacts,
+                                                    const QList<QContact> &modifiedContacts,
+                                                    const QList<QContact> &deletedContacts)
+{
+    Q_UNUSED(collection)
+
+    m_collection.setExtendedMetaData(CollectionKeyLastSync, QDateTime::currentDateTimeUtc());
+
+    QtContactsSqliteExtensions::TwoWayContactSyncAdaptor::storeRemoteChangesLocally(m_collection, addedContacts, modifiedContacts, deletedContacts);
 }
 
 template <typename T>
@@ -141,8 +205,7 @@ static void setGuid(QContact *contact, const QString &id)
 {
     Q_ASSERT(contact);
     auto detail = contact->detail<QContactGuid>();
-    auto guid = QStringLiteral("%1:%2").arg(KnownContactsSyncTarget).arg(id);
-    detail.setGuid(guid);
+    detail.setGuid(id);
     contact->saveDetail(&detail);
 }
 
@@ -218,25 +281,7 @@ static void setCompanyInfo(QContact *contact, const QSettings &file)
     }
 }
 
-QContact KnownContactsSyncer::getContact(const QString &id)
-{
-    QContactDetailFilter syncTargetFilter;
-    syncTargetFilter.setDetailType(QContactDetail::TypeSyncTarget, QContactSyncTarget::FieldSyncTarget);
-    syncTargetFilter.setValue(KnownContactsSyncTarget);
-    QContactDetailFilter guidFilter;
-    guidFilter.setDetailType(QContactDetail::TypeGuid, QContactGuid::FieldGuid);
-    guidFilter.setValue(QStringLiteral("%1:%2").arg(KnownContactsSyncTarget).arg(id));
-    guidFilter.setMatchFlags(QContactDetailFilter::MatchExactly);
-    QList<QContactId> candidates = contactManager().contactIds(syncTargetFilter & guidFilter);
-    if (candidates.size()) {
-        if (candidates.size() > 1)
-            LOG_WARNING("More than one plausible contact found");
-        return contactManager().contact(candidates.at(0));
-    }
-    return QContact();
-}
-
-QList<QContact> KnownContactsSyncer::readContacts(QSettings &file)
+void KnownContactsSyncer::readContacts(QSettings *file, QHash<QString, QContact> *contacts)
 {
     FUNCTION_CALL_TRACE;
 
@@ -245,35 +290,45 @@ QList<QContact> KnownContactsSyncer::readContacts(QSettings &file)
      * but can be extended to support more as long as the fields are
      * kept optional.
      */
-    QList<QContact> contacts;
-    for (const auto &id : file.childGroups()) {
-        file.beginGroup(id);
-        auto contact = getContact(id);
-        setGuid(&contact, id);
-        setNames(&contact, file);
-        setPhoneNumbers(&contact, file);
-        setEmailAddress(&contact, file);
-        setCompanyInfo(&contact, file);
+    for (const auto &id : file->childGroups()) {
+        file->beginGroup(id);
 
-        contacts.append(contact);
-        file.endGroup();
+        auto it = contacts->find(id);
+        if (it == contacts->end()) {
+            it = contacts->insert(id, QContact());
+            setGuid(&it.value(), id);
+        }
+
+        QContact &contact = it.value();
+        setNames(&contact, *file);
+        setPhoneNumbers(&contact, *file);
+        setEmailAddress(&contact, *file);
+        setCompanyInfo(&contact, *file);
+
+        file->endGroup();
     }
-    return contacts;
 }
 
-void KnownContactsSyncer::handleSyncFailure(Failure error)
+void KnownContactsSyncer::syncFinishedSuccessfully()
 {
-    LOG_WARNING("knowncontacts sync failed, emitting error code" << error);
-    purgeSyncStateData(AccountId);
-    emit syncFailed(error);
+    LOG_DEBUG("Sync finished OK");
+    emit syncSucceeded();
+}
+
+void KnownContactsSyncer::syncFinishedWithError()
+{
+    LOG_WARNING("Sync finished with error");
+    emit syncFailed();
 }
 
 bool KnownContactsSyncer::purgeData()
 {
-    // Remove stale contacts
-    bool removed = removeAllContacts();
-    // Remove OOB data
-    removed &= purgeSyncStateData(AccountId, true);
-    // Return true if all data got removed
-    return removed;
+    const QContactCollectionId collectionId = findCollection(contactManager(), KnownContactsCollectionName).id();
+    if (!collectionId.isNull() && !contactManager().removeCollection(collectionId)) {
+        LOG_WARNING("Failed to remove contact collection:" << contactManager().error());
+        return false;
+    }
+
+    LOG_INFO("Successfully removed contact collection" << collectionId);
+    return true;
 }
