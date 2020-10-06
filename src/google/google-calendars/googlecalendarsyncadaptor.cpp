@@ -439,7 +439,8 @@ QJsonObject kCalToJson(KCalCore::Event::Ptr event, KCalCore::ICalFormat &icalFor
         start.insert(QLatin1String("timeZone"), QJsonValue(event->dtStart().toString(KLONGTZ_FORMAT)));
     }
     if (event->dtEnd().isDateOnly() || (event->allDay() && event->dtEnd().time() == QTime(0,0,0))) {
-        end.insert(QLatin1String("date"), QLocale::c().toString(event->dateEnd(), QDATEONLY_FORMAT));
+        // For all day events, the end date is exclusive, so we need to add 1
+        end.insert(QLatin1String("date"), QLocale::c().toString(event->dateEnd().addDays(1), QDATEONLY_FORMAT));
     } else {
         end.insert(QLatin1String("dateTime"), event->dtEnd().toString(RFC3339_FORMAT));
         end.insert(QLatin1String("timeZone"), QJsonValue(event->dtEnd().toString(KLONGTZ_FORMAT)));
@@ -603,7 +604,7 @@ void extractStartAndEnd(const QJsonObject &eventData,
                     // multi-day all-day event.
                     // as noted above, Google will send all-day events as having an end-date
                     // of real-end-date+1 in order to conform to iCal spec (exclusive end dt).
-                    *end = KDateTime(QLocale::c().toDate(endTimeString, QDATEONLY_FORMAT), QTime(), KDateTime::ClockTime);
+                    *end = KDateTime(QLocale::c().toDate(endTimeString, QDATEONLY_FORMAT).addDays(-1), QTime(), KDateTime::ClockTime);
                     end->setDateOnly(true);
                     *isAllDay = true;
                 }
@@ -890,7 +891,7 @@ void jsonToKCal(const QJsonObject &json, KCalCore::Event::Ptr event, int default
         UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, hasEndDate, setHasEndDate, false, changed)
     }
     if (isAllDay) {
-        UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, allDay, setAllDay, false, changed)
+        UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, allDay, setAllDay, true, changed)
     }
     extractAlarms(json, event, defaultReminderStartOffset, changed);
     END_EVENT_UPDATES_IF_REQUIRED(event, changed, !alreadyStarted);
