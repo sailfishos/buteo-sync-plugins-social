@@ -507,4 +507,8 @@ rm -rf %{buildroot}
 %qmake5_install
 
 %post
+/sbin/ldconfig || :
 systemctl-user try-restart msyncd.service || :
+
+%postun
+/sbin/ldconfig || :
