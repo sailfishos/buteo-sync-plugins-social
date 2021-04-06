@@ -741,14 +741,14 @@ void OneDriveBackupOperationSyncAdaptor::remoteFileFinishedHandler()
         // note: no access token is required to access the content redirect url.
         bool ok = false;
         QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
-        if (!ok || !parsed.contains("@content.downloadUrl")) {
+        redirectUrl = parsed.value("@microsoft.graph.downloadUrl").toString();
+        if (!ok || redirectUrl.isEmpty()) {
             SOCIALD_LOG_ERROR("no content redirect url exists in file metadata for file:" << remoteFile);
             debugDumpJsonResponse(data);
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
             return;
         }
-        redirectUrl = parsed.value("@content.downloadUrl").toString();
         SOCIALD_LOG_DEBUG("redirected from:" << remoteFileName << "to:" << redirectUrl);
         requestData(accountId, QString(), localPath, remotePath, remoteFile, redirectUrl);
     } else {
@@ -819,11 +819,11 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
 
     } else if (m_uploadSessionUrl.isEmpty()) {
         // Create an upload session
-        QString createUploadSessionJson = QStringLiteral(
+        const QString createUploadSessionJson = QStringLiteral(
             "{"
                 "\"name\": \"%1\""
             "}").arg(m_localFileInfo.fileName());
-        QByteArray data = createUploadSessionJson.toUtf8();
+        const QByteArray data = createUploadSessionJson.toUtf8();
 
         const QUrl url = QUrl(QStringLiteral("%1/%2:/%3/%4:/createUploadSession").arg(api(), m_remoteAppDir, remotePath, localFile));
         QNetworkRequest request(url);
@@ -851,9 +851,9 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
             }
         }
 
-        qint64 readSize = qMin(UploadChunkSize, m_uploadFile->size() - m_nextFileUploadPos);
+        const qint64 readSize = qMin(UploadChunkSize, m_uploadFile->size() - m_nextFileUploadPos);
         m_uploadFile->seek(m_nextFileUploadPos);
-        QByteArray data(m_uploadFile->read(readSize));
+        const QByteArray data(m_uploadFile->read(readSize));
         const QString contentRange = QStringLiteral("bytes %1-%2/%3")   // e.g. "bytes 0-25/128"
                 .arg(m_nextFileUploadPos)
                 .arg(m_nextFileUploadPos + data.size() - 1)     // -1 because range is inclusive
