@@ -93,6 +93,8 @@ void OneDriveDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
 {
     // OneDrive sends error code 204 (HTTP code 401) for Unauthorized Error
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+
     if (err == QNetworkReply::AuthenticationRequiredError) {
         int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         SOCIALD_LOG_INFO("sociald:OneDrive: received:" << httpCode <<
@@ -103,7 +105,8 @@ void OneDriveDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
 
     SOCIALD_LOG_ERROR(SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
                       "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced error:" << err);
+                      "experienced error:" << err << "HTTP code:" << httpCode
+                      << "data:" << reply->readAll());
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.

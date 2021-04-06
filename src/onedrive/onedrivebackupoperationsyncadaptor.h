@@ -80,7 +80,8 @@ private Q_SLOTS:
     void remotePathFinishedHandler();
     void remoteFileFinishedHandler();
     void createRemotePathFinishedHandler();
-    void createRemoteFileFinishedHandler();
+    void filePartUploadFinishedHandler();
+    void createUploadSessionFinishedHandler();
     void downloadProgressHandler(qint64 bytesReceived, qint64 bytesTotal);
     void uploadProgressHandler(qint64 bytesSent, qint64 bytesTotal);
 
@@ -102,7 +103,12 @@ private:
     QList<RemoteDirectory> m_remoteDirectories;
     QString m_accessToken;
     QString m_remoteDirPath;
+    QString m_uploadSessionUrl;
     QFileInfo m_localFileInfo;
+
+    QFile *m_uploadFile = nullptr;
+    qint64 m_nextFileUploadPos = 0;
+
     int m_accountId = 0;
 };
 

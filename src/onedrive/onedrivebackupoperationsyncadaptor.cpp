@@ -35,6 +35,9 @@
 
 namespace  {
 
+// OneDrive upload fragments must be multiple of 320kb
+static const qint64 UploadChunkSize = 327680;
+
 void debugDumpResponse(const QByteArray &data)
 {
     QString alldata = QString::fromUtf8(data);
@@ -813,24 +816,58 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         SOCIALD_LOG_DEBUG("with data:" << createFolderJson);
 
         reply = m_networkAccessManager->post(request, data);
+
+    } else if (m_uploadSessionUrl.isEmpty()) {
+        // Create an upload session
+        QString createUploadSessionJson = QStringLiteral(
+            "{"
+                "\"name\": \"%1\""
+            "}").arg(m_localFileInfo.fileName());
+        QByteArray data = createUploadSessionJson.toUtf8();
+
+        const QUrl url = QUrl(QStringLiteral("%1/%2:/%3/%4:/createUploadSession").arg(api(), m_remoteAppDir, remotePath, localFile));
+        QNetworkRequest request(url);
+        request.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
+        request.setHeader(QNetworkRequest::ContentTypeHeader,
+                          QVariant::fromValue<QString>(QString::fromLatin1("application/json")));
+        request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
+                         QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+        SOCIALD_LOG_DEBUG("Creating upload session for remote file:"
+                          << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
+                          << "via request:" << url.toString());
+        reply = m_networkAccessManager->post(request, data);
+
     } else {
         // attempt to create a remote file.
-        QUrl url = QUrl(QStringLiteral("%1/%2:/%3/%4:/content").arg(api(), m_remoteAppDir, remotePath, localFile));
-        QString localFileName = QStringLiteral("%1/%2").arg(localPath, localFile);
-        QFile f(localFileName, this);
-         if(!f.open(QIODevice::ReadOnly)){
-             SOCIALD_LOG_ERROR("unable to open local file:" << localFileName << "for upload to OneDrive Backup with account:" << accountId);
-         } else {
-             QByteArray data(f.readAll());
-             f.close();
-             QNetworkRequest req(url);
-             req.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
-             req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-             req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                              QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
-             SOCIALD_LOG_DEBUG("Attempting to create the remote file:" << QStringLiteral("%1/%2").arg(remotePath).arg(localFile) << "via request:" << url.toString());
-             reply = m_networkAccessManager->put(req, data);
+        QUrl url(m_uploadSessionUrl);
+
+        if (!m_uploadFile) {
+            m_uploadFile = new QFile(m_localFileInfo.filePath());
+            m_nextFileUploadPos = 0;
+            if (!m_uploadFile->open(QIODevice::ReadOnly)){
+                SOCIALD_LOG_ERROR("unable to open local file:" << m_localFileInfo.filePath()
+                                  << "for upload to OneDrive Backup with account:" << accountId);
+                return;
+            }
         }
+
+        qint64 readSize = qMin(UploadChunkSize, m_uploadFile->size() - m_nextFileUploadPos);
+        m_uploadFile->seek(m_nextFileUploadPos);
+        QByteArray data(m_uploadFile->read(readSize));
+        const QString contentRange = QStringLiteral("bytes %1-%2/%3")   // e.g. "bytes 0-25/128"
+                .arg(m_nextFileUploadPos)
+                .arg(m_nextFileUploadPos + data.size() - 1)     // -1 because range is inclusive
+                .arg(m_uploadFile->size());
+
+        QNetworkRequest req(url);
+        req.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
+        req.setRawHeader(QByteArrayLiteral("Content-Range"), contentRange.toLatin1());
+        req.setRawHeader(QByteArrayLiteral("Authorization"),
+                         QByteArrayLiteral("Bearer ") + accessToken.toUtf8());
+        SOCIALD_LOG_DEBUG("Attempting to upload" << contentRange << "of file:"
+                          << m_localFileInfo.filePath()
+                          << "via request:" << url.toString());
+        reply = m_networkAccessManager->put(req, data);
     }
 
     if (reply) {
@@ -843,10 +880,12 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
         connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
         if (localFile.isEmpty()) {
-            connect(reply, SIGNAL(finished()), this, SLOT(createRemotePathFinishedHandler()));
+            connect(reply, &QNetworkReply::finished, this, &OneDriveBackupOperationSyncAdaptor::createRemotePathFinishedHandler);
+        } else if (m_uploadSessionUrl.isEmpty()) {
+            connect(reply, &QNetworkReply::finished, this, &OneDriveBackupOperationSyncAdaptor::createUploadSessionFinishedHandler);
         } else {
-            connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(uploadProgressHandler(qint64,qint64)));
-            connect(reply, SIGNAL(finished()), this, SLOT(createRemoteFileFinishedHandler()));
+            connect(reply, &QNetworkReply::uploadProgress, this, &OneDriveBackupOperationSyncAdaptor::uploadProgressHandler);
+            connect(reply, &QNetworkReply::finished, this, &OneDriveBackupOperationSyncAdaptor::filePartUploadFinishedHandler);
         }
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
@@ -918,29 +957,101 @@ void OneDriveBackupOperationSyncAdaptor::createRemotePathFinishedHandler()
     decrementSemaphore(accountId);
 }
 
-void OneDriveBackupOperationSyncAdaptor::createRemoteFileFinishedHandler()
+void OneDriveBackupOperationSyncAdaptor::createUploadSessionFinishedHandler()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
-    QByteArray data = reply->readAll();
-    int accountId = reply->property("accountId").toInt();
-    QString localPath = reply->property("localPath").toString();
-    QString remotePath = reply->property("remotePath").toString();
-    QString localFile = reply->property("localFile").toString();
-    bool isError = reply->property("isError").toBool();
-    int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray data = reply->readAll();
+    const int accountId = reply->property("accountId").toInt();
+    const QString localPath = reply->property("localPath").toString();
+    const QString remotePath = reply->property("remotePath").toString();
+    const QString localFile = reply->property("localFile").toString();
+    const QString accessToken = reply->property("accessToken").toString();
+    const bool isError = reply->property("isError").toBool();
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
-    if (isError) {
-        SOCIALD_LOG_ERROR("failed to backup file:" << localPath << localFile << "to:" << remotePath <<
-                          "for OneDrive account:" << accountId << ", code:" << httpCode);
+
+    bool ok = false;
+    const QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
+    const QString uploadSessionUrl = parsed.value("uploadUrl").toString();
+    if (isError || !ok || uploadSessionUrl.isEmpty()) {
+        SOCIALD_LOG_ERROR("failed to read uploadUrl from createUploadSessionRequest for path" << remotePath
+                          << "to upload file" << localPath << localFile
+                          << "for OneDrive account:" << accountId << ", code:" << httpCode
+                          << "response:" << data);
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
-        decrementSemaphore(accountId);
-        return;
+    } else {
+        m_uploadSessionUrl = uploadSessionUrl;
+
+        SOCIALD_LOG_DEBUG("successfully created upload session to upload to:" << m_uploadSessionUrl
+                          << localPath << localFile << "to:" << remotePath
+                          << "for OneDrive account:" << accountId);
+        uploadData(accountId, accessToken, localPath, remotePath, localFile);
     }
 
-    SOCIALD_LOG_DEBUG("successfully uploaded backup of file:" << localPath << localFile << "to:" << remotePath <<
-                      "for OneDrive account:" << accountId);
+    decrementSemaphore(accountId);
+}
+
+void OneDriveBackupOperationSyncAdaptor::filePartUploadFinishedHandler()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    const QByteArray data = reply->readAll();
+    const int accountId = reply->property("accountId").toInt();
+    const QString localPath = reply->property("localPath").toString();
+    const QString remotePath = reply->property("remotePath").toString();
+    const QString localFile = reply->property("localFile").toString();
+    const QString accessToken = reply->property("accessToken").toString();
+
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    reply->deleteLater();
+    removeReplyTimeout(accountId, reply);
+
+    int nextRangeStart = 0;
+
+    if (httpCode == 200 || httpCode == 201) { // OK or Created
+        SOCIALD_LOG_DEBUG("successfully uploaded backup of file:" << localPath << localFile << "to:" << remotePath <<
+                          "for OneDrive account:" << accountId);
+    } else if (httpCode == 202) {   // Accepted
+        bool ok = false;
+        const QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
+        const QJsonArray nextExpectedRanges = parsed.value("nextExpectedRanges").toArray();
+
+        for (const QJsonValue &value : nextExpectedRanges) {
+            const QString range = value.toString();
+            const int sepIndex = range.indexOf('-');
+            if (sepIndex > 0) {
+                nextRangeStart = range.mid(0, sepIndex).toInt();
+                break;
+            }
+        }
+
+        if (nextRangeStart == 0) {
+            SOCIALD_LOG_ERROR("Cannot find nextExpectedRanges data to upload next part of"
+                              << m_localFileInfo.filePath() << "to" << remotePath
+                              << "for OneDrive account:" << accountId << ", code:" << httpCode
+                              << "response:" << data);
+            debugDumpJsonResponse(data);
+            setStatus(SocialNetworkSyncAdaptor::Error);
+        }
+
+    } else {
+        SOCIALD_LOG_ERROR("failed to backup file:" << localPath << localFile << "to:" << remotePath <<
+                          "for OneDrive account:" << accountId << ", code:" << httpCode
+                          << "response:" << data);
+        debugDumpJsonResponse(data);
+        setStatus(SocialNetworkSyncAdaptor::Error);
+    }
+
+    if (nextRangeStart > 0) {
+        m_nextFileUploadPos = nextRangeStart;
+        uploadData(accountId, accessToken, localPath, remotePath, localFile);
+    } else {
+        m_uploadFile->close();
+        delete m_uploadFile;
+        m_uploadFile = nullptr;
+    }
+
     decrementSemaphore(accountId);
 }
 
