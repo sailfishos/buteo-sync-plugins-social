@@ -565,16 +565,6 @@ void extractRecurrence(const QJsonArray &recurrence, KCalendarCore::Event::Ptr e
           traceDumpStr(QString::fromUtf8(QJsonDocument(recurrence).toJson()));
         }
     }
-
-    // Add an extra EXDATE for each exception event the calendar
-    // Google doesn't include these as EXDATE (following the spec) whereas mkcal does
-    for (const QDateTime exception : exceptions) {
-        if (exception.time().isNull()) {
-            kcalRecurrence->addExDate(exception.date());
-        } else {
-            kcalRecurrence->addExDateTime(exception);
-        }
-    }
 }
 
 void extractOrganizer(const QJsonObject &creatorObj, const QJsonObject &organizerObj, KCalendarCore::Event::Ptr event)
@@ -951,17 +941,14 @@ KCalendarCore::Event::Ptr dissociateSingleOccurrence(const KCalendarCore::Event:
     }
 
     // Add a recurrence rule to the parent if it needs it
-    // Add an ex-date to the parent for the dissociation
     if (event->allDay()) {
         if (!event->recursOn(dateTime.date(), dateTime.timeZone())) {
             event->recurrence()->addRDate(dateTime.date());
         }
-        event->recurrence()->addExDate(dateTime.date());
     } else {
         if (!event->recursAt(dateTime)) {
             event->recurrence()->addRDateTime(dateTime);
         }
-        event->recurrence()->addExDateTime(dateTime);
     }
 
     // Set the recurrenceId for the new incidence
