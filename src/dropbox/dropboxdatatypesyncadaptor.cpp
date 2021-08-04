@@ -54,34 +54,34 @@ DropboxDataTypeSyncAdaptor::~DropboxDataTypeSyncAdaptor()
 void DropboxDataTypeSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 {
     if (dataTypeString != SocialNetworkSyncAdaptor::dataTypeName(m_dataType)) {
-        SOCIALD_LOG_ERROR("Dropbox" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                          "sync adaptor was asked to sync" << dataTypeString);
+        qCWarning(lcSocialPlugin) << "Dropbox" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+                          "sync adaptor was asked to sync" << dataTypeString;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
     if (clientId().isEmpty()) {
-        SOCIALD_LOG_ERROR("client id couldn't be retrieved for Dropbox account" << accountId);
+        qCWarning(lcSocialPlugin) << "client id couldn't be retrieved for Dropbox account" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
     if (clientSecret().isEmpty()) {
-        SOCIALD_LOG_ERROR("client secret couldn't be retrieved for Dropbox account" << accountId);
+        qCWarning(lcSocialPlugin) << "client secret couldn't be retrieved for Dropbox account" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
     setStatus(SocialNetworkSyncAdaptor::Busy);
     updateDataForAccount(accountId);
-    SOCIALD_LOG_DEBUG("successfully triggered sync with profile:" << m_accountSyncProfile->name());
+    qCDebug(lcSocialPlugin) << "successfully triggered sync with profile:" << m_accountSyncProfile->name();
 }
 
 void DropboxDataTypeSyncAdaptor::updateDataForAccount(int accountId)
 {
     Accounts::Account *account = Accounts::Account::fromId(m_accountManager, accountId, this);
     if (!account) {
-        SOCIALD_LOG_ERROR("existing account with id" << accountId << "couldn't be retrieved");
+        qCWarning(lcSocialPlugin) << "existing account with id" << accountId << "couldn't be retrieved";
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -101,13 +101,13 @@ void DropboxDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (err == QNetworkReply::AuthenticationRequiredError) {
-        SOCIALD_LOG_INFO("sociald:Dropbox: would normally set CredentialsNeedUpdate for account"
-                         << reply->property("accountId").toInt() << "but could be spurious. Http code:" << httpCode);
+        qCInfo(lcSocialPlugin) << "sociald:Dropbox: would normally set CredentialsNeedUpdate for account"
+                         << reply->property("accountId").toInt() << "but could be spurious. Http code:" << httpCode;
     }
 
-    SOCIALD_LOG_ERROR(SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
                       "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced error:" << httpCode);
+                      "experienced error:" << httpCode;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -122,9 +122,9 @@ void DropboxDataTypeSyncAdaptor::sslErrorsHandler(const QList<QSslError> &errs)
     if (errs.size() > 0) {
         sslerrs.chop(2);
     }
-    SOCIALD_LOG_ERROR(SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
                       "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced ssl errors:" << sslerrs);
+                      "experienced ssl errors:" << sslerrs;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     sender()->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -210,7 +210,7 @@ void DropboxDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     account->selectService(srv);
     SignOn::Identity *identity = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
     if (!identity) {
-        SOCIALD_LOG_ERROR("account" << accountId << "has no valid credentials; cannot sign in");
+        qCWarning(lcSocialPlugin) << "account" << accountId << "has no valid credentials; cannot sign in";
         decrementSemaphore(accountId);
         return;
     }
@@ -220,7 +220,7 @@ void DropboxDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     QString mechanism = accSrv.authData().mechanism();
     SignOn::AuthSession *session = identity->createSession(method);
     if (!session) {
-        SOCIALD_LOG_ERROR("could not create signon session for account" << accountId);
+        qCWarning(lcSocialPlugin) << "could not create signon session for account" << accountId;
         identity->deleteLater();
         decrementSemaphore(accountId);
         return;
@@ -249,8 +249,8 @@ void DropboxDataTypeSyncAdaptor::signOnError(const SignOn::Error &error)
     Accounts::Account *account = session->property("account").value<Accounts::Account*>();
     SignOn::Identity *identity = session->property("identity").value<SignOn::Identity*>();
     int accountId = account->id();
-    SOCIALD_LOG_ERROR("credentials for account with id" << accountId <<
-                      "couldn't be retrieved:" << error.type() << error.message());
+    qCWarning(lcSocialPlugin) << "credentials for account with id" << accountId <<
+                      "couldn't be retrieved:" << error.type() << error.message();
 
     // if the error is because credentials have expired, we
     // set the CredentialsNeedUpdate key.
@@ -283,7 +283,7 @@ void DropboxDataTypeSyncAdaptor::signOnResponse(const SignOn::SessionData &respo
     if (data.contains(QLatin1String("AccessToken"))) {
         accessToken = data.value(QLatin1String("AccessToken")).toString();
     } else {
-        SOCIALD_LOG_INFO("signon response for account with id" << accountId << "contained no access token");
+        qCInfo(lcSocialPlugin) << "signon response for account with id" << accountId << "contained no access token";
     }
 
     m_api = account->value(QStringLiteral("hosts/ApiHost")).toString();

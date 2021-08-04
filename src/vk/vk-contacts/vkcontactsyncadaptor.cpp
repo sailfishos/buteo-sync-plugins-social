@@ -86,8 +86,8 @@ QList<QContactCollection> findAllCollections(QContactManager &contactManager, in
                                      &deletedCollections,
                                      &unmodifiedCollections,
                                      &error)) {
-        LOG_WARNING("Cannot find collections for account" << accountId
-                            << "app" << qAppName() << "error:" << error);
+        qCWarning(lcSocialPlugin) << "Cannot find collections for account" << accountId
+                            << "app" << qAppName() << "error:" << error;
         return QList<QContactCollection>();
     }
 
@@ -116,7 +116,7 @@ VKContactSqliteSyncAdaptor::VKContactSqliteSyncAdaptor(int accountId, VKContactS
 {
     m_collection = findCollection(contactManager(), FriendCollectionName, m_accountId);
     if (m_collection.id().isNull()) {
-        SOCIALD_LOG_DEBUG("No friends collection saved yet for account:" << m_accountId);
+        qCDebug(lcSocialPlugin) << "No friends collection saved yet for account:" << m_accountId;
 
         m_collection.setMetaData(QContactCollection::KeyName, FriendCollectionName);
         m_collection.setMetaData(QContactCollection::KeyDescription, QStringLiteral("VK friend contacts"));
@@ -126,7 +126,7 @@ VKContactSqliteSyncAdaptor::VKContactSqliteSyncAdaptor(int accountId, VKContactS
         m_collection.setExtendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_ACCOUNTID, m_accountId);
         m_collection.setExtendedMetaData(COLLECTION_EXTENDEDMETADATA_KEY_READONLY, true);
     } else {
-        SOCIALD_LOG_DEBUG("Found friends collection" << m_collection.id() << "for account:" << m_accountId);
+        qCDebug(lcSocialPlugin) << "Found friends collection" << m_collection.id() << "for account:" << m_accountId;
     }
 }
 
@@ -142,7 +142,7 @@ bool VKContactSqliteSyncAdaptor::determineRemoteCollections()
 
 bool VKContactSqliteSyncAdaptor::deleteRemoteCollection(const QContactCollection &collection)
 {
-    SOCIALD_LOG_ERROR("Upsync to remote not supported, not deleting collection" << collection.id());
+    qCWarning(lcSocialPlugin) << "Upsync to remote not supported, not deleting collection" << collection.id();
     return true;
 }
 
@@ -167,8 +167,8 @@ bool VKContactSqliteSyncAdaptor::storeLocalChangesRemotely(const QContactCollect
         q->deleteDownloadedAvatar(contact);
     }
 
-    SOCIALD_LOG_DEBUG("Upsync to remote not supported, ignoring remote changes for"
-                      << collection.id());
+    qCDebug(lcSocialPlugin) << "Upsync to remote not supported, ignoring remote changes for"
+                      << collection.id();
     return true;
 }
 
@@ -189,14 +189,14 @@ void VKContactSqliteSyncAdaptor::storeRemoteChangesLocally(const QContactCollect
 
 void VKContactSqliteSyncAdaptor::syncFinishedSuccessfully()
 {
-    SOCIALD_LOG_DEBUG("Sync finished OK");
+    qCDebug(lcSocialPlugin) << "Sync finished OK";
 
     // If this is the first sync, TWCSA will have saved the collection and given it a valid id, so
     // update m_collection so that any post-sync operations (e.g. saving of queued avatar downloads)
     // will refer to a valid collection.
     const QContactCollection savedCollection = findCollection(contactManager(), FriendCollectionName, m_accountId);
     if (savedCollection.id().isNull()) {
-        SOCIALD_LOG_DEBUG("Error: cannot find saved friends collection!");
+        qCDebug(lcSocialPlugin) << "Error: cannot find saved friends collection!";
     } else {
         m_collection.setId(savedCollection.id());
     }
@@ -204,7 +204,7 @@ void VKContactSqliteSyncAdaptor::syncFinishedSuccessfully()
 
 void VKContactSqliteSyncAdaptor::syncFinishedWithError()
 {
-    SOCIALD_LOG_DEBUG("Sync finished with error");
+    qCDebug(lcSocialPlugin) << "Sync finished with error";
 }
 
 int VKContactSqliteSyncAdaptor::accountIdForCollection(const QContactCollection &collection)
@@ -248,7 +248,7 @@ void VKContactSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncAd
 {
     const QList<QContactCollection> collections = findAllCollections(*m_contactManager, oldId);
     if (collections.isEmpty()) {
-        SOCIALD_LOG_ERROR("Nothing to purge, no collection has been saved for account" << oldId);
+        qCWarning(lcSocialPlugin) << "Nothing to purge, no collection has been saved for account" << oldId;
         return;
     }
 
@@ -267,7 +267,7 @@ void VKContactSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncAd
             const QString imageUrl = avatar.imageUrl().toString();
             if (!imageUrl.isEmpty()) {
                 if (!QFile::remove(imageUrl)) {
-                    SOCIALD_LOG_ERROR("Failed to remove avatar:" << imageUrl);
+                    qCWarning(lcSocialPlugin) << "Failed to remove avatar:" << imageUrl;
                 }
             }
         }
@@ -287,10 +287,10 @@ void VKContactSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncAd
                           QtContactsSqliteExtensions::ContactManagerEngine::PreserveLocalChanges,
                           true,
                           &error)) {
-        SOCIALD_LOG_INFO("purged account" << oldId << "and successfully removed collections");
+        qCInfo(lcSocialPlugin) << "purged account" << oldId << "and successfully removed collections";
     } else {
-        SOCIALD_LOG_ERROR("Failed to remove collection during purge of account" << oldId
-                          << "error:" << error);
+        qCWarning(lcSocialPlugin) << "Failed to remove collection during purge of account" << oldId
+                          << "error:" << error;
     }
 }
 
@@ -298,10 +298,10 @@ void VKContactSyncAdaptor::retryThrottledRequest(const QString &request, const Q
 {
     int accountId = args[0].toInt();
     if (retryLimitReached) {
-        SOCIALD_LOG_ERROR("hit request retry limit! unable to request data from VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "hit request retry limit! unable to request data from VK account with id" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
-        SOCIALD_LOG_DEBUG("retrying Contacts" << request << "request for VK account:" << accountId);
+        qCDebug(lcSocialPlugin) << "retrying Contacts" << request << "request for VK account:" << accountId;
         requestData(accountId, args[1].toInt());
     }
     decrementSemaphore(accountId); // finished waiting for the request.
@@ -320,7 +320,7 @@ void VKContactSyncAdaptor::beginSync(int accountId, const QString &accessToken)
     sqliteSync = new VKContactSqliteSyncAdaptor(accountId, this);
     if (!sqliteSync->startSync()) {
         sqliteSync->deleteLater();
-        SOCIALD_LOG_ERROR("unable to init sync adapter - aborting sync VK contacts with account:" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to init sync adapter - aborting sync VK contacts with account:" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -384,9 +384,9 @@ void VKContactSyncAdaptor::contactsFinishedHandler()
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
 
-    SOCIALD_LOG_TRACE("received VK friends data for account:" << accountId << ":");
+    qCDebug(lcSocialPluginTrace) << "received VK friends data for account:" << accountId << ":";
     Q_FOREACH (const QString &line, QString::fromUtf8(data).split('\n', QString::SkipEmptyParts)) {
-        SOCIALD_LOG_TRACE(line);
+        qCDebug(lcSocialPluginTrace) << line;
     }
 
     if (isError) {
@@ -400,12 +400,12 @@ void VKContactSyncAdaptor::contactsFinishedHandler()
             // it will be decremented in retryThrottledRequest().
             return;
         }
-        SOCIALD_LOG_ERROR("error occurred when performing contacts request for VK account:" << accountId);
+        qCWarning(lcSocialPlugin) << "error occurred when performing contacts request for VK account:" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
         return;
     } else if (data.isEmpty()) {
-        SOCIALD_LOG_ERROR("no contact data in reply from VK with account:" << accountId);
+        qCWarning(lcSocialPlugin) << "no contact data in reply from VK with account:" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
         return;
@@ -419,9 +419,9 @@ void VKContactSyncAdaptor::contactsFinishedHandler()
     int totalCount = response.value("count").toInt();
     int seenCount = startIndex + SOCIALD_VK_MAX_CONTACT_ENTRY_RESULTS;
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, not continuing sync of contacts from VK with account:" << accountId);
+        qCInfo(lcSocialPlugin) << "sync aborted, not continuing sync of contacts from VK with account:" << accountId;
     } else if (totalCount > seenCount) {
-        SOCIALD_LOG_TRACE("Have received" << seenCount << "contacts, now requesting:" << (seenCount+1) << "through to" << (seenCount+1+SOCIALD_VK_MAX_CONTACT_ENTRY_RESULTS));
+        qCDebug(lcSocialPluginTrace) << "Have received" << seenCount << "contacts, now requesting:" << (seenCount+1) << "through to" << (seenCount+1+SOCIALD_VK_MAX_CONTACT_ENTRY_RESULTS);
         startIndex = seenCount;
         requestData(accountId, startIndex);
     } else {
@@ -480,7 +480,7 @@ QList<QContact> VKContactSyncAdaptor::parseContacts(const QJsonArray &json, int 
         } else if (uidint > 0) {
             guid.setGuid(QStringLiteral("%1:%2").arg(accountId).arg(QString::number(uidint)));
         } else {
-            SOCIALD_LOG_ERROR("unable to parse id from VK friend, skipping:" << name);
+            qCWarning(lcSocialPlugin) << "unable to parse id from VK friend, skipping:" << name;
             continue;
         }
         saveNonexportableDetail(c, guid);
@@ -647,17 +647,17 @@ void VKContactSyncAdaptor::deleteDownloadedAvatar(const QContact &contact)
     const QString localFileName = VKContactImageDownloader::staticOutputFile(
                 contactGuid, avatar.imageUrl().toString());
     if (!localFileName.isEmpty() && QFile::remove(localFileName)) {
-        SOCIALD_LOG_DEBUG("Removed avatar" << localFileName << "of deleted contact" << contact.id());
+        qCDebug(lcSocialPlugin) << "Removed avatar" << localFileName << "of deleted contact" << contact.id();
     }
 }
 
 void VKContactSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("sync aborted, skipping finalize of VK contacts from account:" << accountId);
+        qCDebug(lcSocialPlugin) << "sync aborted, skipping finalize of VK contacts from account:" << accountId;
         m_sqliteSync[accountId]->syncFinishedWithError();
     } else {
-        SOCIALD_LOG_DEBUG("finalizing VK contacts sync with account:" << accountId);
+        qCDebug(lcSocialPlugin) << "finalizing VK contacts sync with account:" << accountId;
         // first, ensure we update any avatars required.
         if (m_downloadedContactAvatars[accountId].size()) {
             // load all VK contacts from the database.  We need all details, to avoid clobber.
@@ -674,7 +674,7 @@ void VKContactSyncAdaptor::finalize(int accountId)
                     c = findContact(m_remoteContacts[accountId], it.key());
                 }
                 if (c.isEmpty()) {
-                    SOCIALD_LOG_ERROR("Not saving avatar, cannot find contact with guid" << it.key());
+                    qCWarning(lcSocialPlugin) << "Not saving avatar, cannot find contact with guid" << it.key();
                 } else {
                     // we have downloaded the avatar for this contact, and need to update it.
                     QContactAvatar a;
@@ -693,9 +693,9 @@ void VKContactSyncAdaptor::finalize(int accountId)
 
             QList<QContact> saveList = contactsToSave.values();
             if (m_contactManager->saveContacts(&saveList)) {
-                SOCIALD_LOG_INFO("finalize: added avatars for" << saveList.size() << "VK contacts from account" << accountId);
+                qCInfo(lcSocialPlugin) << "finalize: added avatars for" << saveList.size() << "VK contacts from account" << accountId;
             } else {
-                SOCIALD_LOG_ERROR("finalize: error adding avatars for" << saveList.size() << "VK contacts from account" << accountId);
+                qCWarning(lcSocialPlugin) << "finalize: error adding avatars for" << saveList.size() << "VK contacts from account" << accountId;
             }
         }
 
@@ -742,7 +742,7 @@ void VKContactSyncAdaptor::finalCleanup()
 
     // purge all data for those account ids which no longer exist.
     if (purgeAccountIds.size()) {
-        SOCIALD_LOG_INFO("finalCleanup() purging contacts from" << purgeAccountIds.size() << "non-existent VK accounts");
+        qCInfo(lcSocialPlugin) << "finalCleanup() purging contacts from" << purgeAccountIds.size() << "non-existent VK accounts";
         for (int purgeId : purgeAccountIds) {
             purgeDataForOldAccount(purgeId, SocialNetworkSyncAdaptor::SyncPurge);
         }

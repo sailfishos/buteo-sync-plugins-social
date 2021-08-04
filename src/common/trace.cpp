@@ -1,7 +1,6 @@
 /****************************************************************************
  **
- ** Copyright (C) 2014 Jolla Ltd.
- ** Contact: Chris Adams <chris.adams@jollamobile.com>
+ ** Copyright (C) 2021 Jolla Ltd.
  **
  ** This program/library is free software; you can redistribute it and/or
  ** modify it under the terms of the GNU Lesser General Public License
@@ -19,21 +18,8 @@
  **
  ****************************************************************************/
 
-#ifndef SOCIALD_BUTEOSYNCFW_P_H
-#define SOCIALD_BUTEOSYNCFW_P_H
+#include "trace.h"
 
-#include <SyncCommonDefs.h>
-#include <SyncPluginBase.h>
-#include <ProfileManager.h>
-#include <ClientPlugin.h>
-#include <SyncResults.h>
-#include <ProfileEngineDefs.h>
-#include <SyncProfile.h>
-#include <Profile.h>
-#include <PluginCbInterface.h>
+Q_LOGGING_CATEGORY(lcSocialPlugin, "buteo.plugin.social", QtWarningMsg)
+Q_LOGGING_CATEGORY(lcSocialPluginTrace, "buteo.plugin.social.trace", QtWarningMsg)
 
-#ifndef SOCIALD_TEST_DEFINE
-#define PRIVILEGED_DATA_DIR QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + QLatin1String("/.local/share/system/privileged")
-#endif
-
-#endif // SOCIALD_BUTEOSYNCFW_P_H

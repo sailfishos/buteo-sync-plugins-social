@@ -29,8 +29,6 @@
 #include <QDBusPendingCall>
 
 #include <PluginCbInterface.h>
-#include <LogMacros.h>
-
 
 
 SocialdPlugin::SocialdPlugin(const QString& pluginName,

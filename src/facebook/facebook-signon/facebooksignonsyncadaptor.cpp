@@ -97,7 +97,7 @@ void FacebookSignonSyncAdaptor::beginSync(int accountId, const QString &accessTo
         setupReplyTimeout(accountId, reply);
         incrementSemaphore(accountId);
     } else {
-        SOCIALD_LOG_ERROR("unable to verify access token via network request for Facebook account:" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to verify access token via network request for Facebook account:" << accountId;
     }
 }
 
@@ -113,7 +113,7 @@ void FacebookSignonSyncAdaptor::requestFinishedHandler()
     removeReplyTimeout(accountId, reply);
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, skipping signon sync reply handling");
+        qCInfo(lcSocialPlugin) << "sync aborted, skipping signon sync reply handling";
         decrementSemaphore(accountId);
         return;
     }
@@ -139,8 +139,8 @@ void FacebookSignonSyncAdaptor::requestFinishedHandler()
                     || errorCode == 10
                     || (errorCode >= 200 && errorCode <= 299)) {
                 // the account is in a state which requires user intervention
-                SOCIALD_LOG_ERROR("access token has expired for Facebook account" << accountId <<
-                                  ":" <<  errorCode << "," << errorType << "," << errorMessage);
+                qCWarning(lcSocialPlugin) << "access token has expired for Facebook account" << accountId <<
+                                  ":" <<  errorCode << "," << errorType << "," << errorMessage;
                 forceTokenExpiry(0, accountId, accessToken);
             } else {
                 // other error (downtime / service disruption / etc)
@@ -156,12 +156,12 @@ void FacebookSignonSyncAdaptor::requestFinishedHandler()
         // if the token has been manually revoked.  There is no
         // response data in this case.
         // the account is in a state which requires user intervention
-        SOCIALD_LOG_ERROR("access token has presumably been revoked for Facebook account" << accountId);
+        qCWarning(lcSocialPlugin) << "access token has presumably been revoked for Facebook account" << accountId;
         forceTokenExpiry(0, accountId, accessToken);
     } else {
         // could have been a network error, or something.
         // we treat it as a sync error, but not a signon error.
-        SOCIALD_LOG_ERROR("unable to parse response information for verification request for Facebook account:" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to parse response information for verification request for Facebook account:" << accountId;
     }
 
     decrementSemaphore(accountId);
@@ -175,7 +175,7 @@ Accounts::Account *FacebookSignonSyncAdaptor::loadAccount(int accountId)
     } else {
         acc = Accounts::Account::fromId(&m_accountManager, accountId, this);
         if (!acc) {
-            SOCIALD_LOG_ERROR("Facebook account" << accountId << "was deleted during signon refresh sync");
+            qCWarning(lcSocialPlugin) << "Facebook account" << accountId << "was deleted during signon refresh sync";
             return 0;
         } else {
             m_accounts.insert(accountId, acc);
@@ -184,8 +184,8 @@ Accounts::Account *FacebookSignonSyncAdaptor::loadAccount(int accountId)
 
     Accounts::Service srv = m_accountManager.service(syncServiceName());
     if (!srv.isValid()) {
-        SOCIALD_LOG_ERROR("invalid service" << syncServiceName() <<
-                          "specified for refresh sync with Facebook account" << accountId);
+        qCWarning(lcSocialPlugin) << "invalid service" << syncServiceName() <<
+                          "specified for refresh sync with Facebook account" << accountId;
         return 0;
     }
 
@@ -196,7 +196,7 @@ void FacebookSignonSyncAdaptor::raiseCredentialsNeedUpdateFlag(int accountId)
 {
     Accounts::Account *acc = loadAccount(accountId);
     if (acc) {
-        SOCIALD_LOG_ERROR("FBSSA: raising CredentialsNeedUpdate flag");
+        qCWarning(lcSocialPlugin) << "FBSSA: raising CredentialsNeedUpdate flag";
         Accounts::Service srv = m_accountManager.service(syncServiceName());
         acc->selectService(srv);
         acc->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
@@ -210,7 +210,7 @@ void FacebookSignonSyncAdaptor::lowerCredentialsNeedUpdateFlag(int accountId)
 {
     Accounts::Account *acc = loadAccount(accountId);
     if (acc) {
-        SOCIALD_LOG_INFO("FBSSA: lowering CredentialsNeedUpdate flag");
+        qCInfo(lcSocialPlugin) << "FBSSA: lowering CredentialsNeedUpdate flag";
         Accounts::Service srv = m_accountManager.service(syncServiceName());
         acc->selectService(srv);
         acc->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(false));
@@ -229,13 +229,13 @@ void FacebookSignonSyncAdaptor::forceTokenExpiry(int seconds, int accountId, con
         acc->selectService(srv);
         SignOn::Identity *identity = acc->credentialsId() > 0 ? SignOn::Identity::existingIdentity(acc->credentialsId()) : 0;
         if (!identity) {
-            SOCIALD_LOG_ERROR("Facebook account" << accountId << "has no valid credentials, cannot perform refresh sync");
+            qCWarning(lcSocialPlugin) << "Facebook account" << accountId << "has no valid credentials, cannot perform refresh sync";
             return;
         }
 
         Accounts::AccountService *accSrv = new Accounts::AccountService(acc, srv);
         if (!accSrv) {
-            SOCIALD_LOG_ERROR("Facebook account" << accountId << "has no valid account service, cannot perform refresh sync");
+            qCWarning(lcSocialPlugin) << "Facebook account" << accountId << "has no valid account service, cannot perform refresh sync";
             identity->deleteLater();
             return;
         }
@@ -244,7 +244,7 @@ void FacebookSignonSyncAdaptor::forceTokenExpiry(int seconds, int accountId, con
         QString mechanism = accSrv->authData().mechanism();
         SignOn::AuthSession *session = identity->createSession(method);
         if (!session) {
-            SOCIALD_LOG_ERROR("could not create signon session for Facebook account" << accountId << "cannot perform refresh sync");
+            qCWarning(lcSocialPlugin) << "could not create signon session for Facebook account" << accountId << "cannot perform refresh sync";
             accSrv->deleteLater();
             identity->deleteLater();
             return;
@@ -285,12 +285,12 @@ void FacebookSignonSyncAdaptor::forceTokenExpiryResponse(const SignOn::SessionDa
         vmrd.insert(key, responseData.getProperty(key));
     }
 
-    SOCIALD_LOG_DEBUG("forcibly updated cache for Facebook account" << accountId << "," <<
-                      "ExpiresIn now:" << vmrd.value("ExpiresIn").toInt() << ", expected" << seconds);
+    qCDebug(lcSocialPlugin) << "forcibly updated cache for Facebook account" << accountId << "," <<
+                      "ExpiresIn now:" << vmrd.value("ExpiresIn").toInt() << ", expected" << seconds;
 
     if (seconds == 0) {
         // successfully forced expiry
-        SOCIALD_LOG_ERROR("forced expiry for reportedly invalid token");
+        qCWarning(lcSocialPlugin) << "forced expiry for reportedly invalid token";
         raiseCredentialsNeedUpdateFlag(accountId);
     } else {
         // successfully forced new ExpiresIn value
@@ -305,12 +305,12 @@ void FacebookSignonSyncAdaptor::forceTokenExpiryError(const SignOn::Error &error
     int accountId = session->property("accountId").toInt();
     int seconds = session->property("seconds").toInt();
 
-    SOCIALD_LOG_INFO("got signon error when performing force-expire for Facebook account" <<
-                     accountId << ":" << error.type() << "," << error.message());
+    qCInfo(lcSocialPlugin) << "got signon error when performing force-expire for Facebook account" <<
+                     accountId << ":" << error.type() << "," << error.message();
 
     if (seconds == 0) {
         // we treat the error as if it was a success, since we need to update the credentials anyway.
-        SOCIALD_LOG_ERROR("forced expiry for reportedly invalid token failed");
+        qCWarning(lcSocialPlugin) << "forced expiry for reportedly invalid token failed";
         raiseCredentialsNeedUpdateFlag(accountId);
     } else {
         // don't raise or lower the flag.  If was previously not raised,

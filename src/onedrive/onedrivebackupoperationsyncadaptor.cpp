@@ -43,15 +43,13 @@ void debugDumpResponse(const QByteArray &data)
     QString alldata = QString::fromUtf8(data);
     QStringList alldatasplit = alldata.split('\n');
     Q_FOREACH (const QString &s, alldatasplit) {
-        SOCIALD_LOG_DEBUG(s);
+        qCDebug(lcSocialPlugin) << s;
     }
 }
 
 void debugDumpJsonResponse(const QByteArray &data)
 {
-    // 8 is the minimum log level for TRACE logs
-    // as defined in Buteo's LogMacros.h
-    if (Buteo::Logger::instance()->getLogLevel() < 8) {
+    if (!lcSocialPluginTrace().isDebugEnabled()) {
         return;
     }
 
@@ -124,7 +122,7 @@ void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString 
 {
     QDBusReply<QString> backupDeviceIdReply = m_sailfishBackup->call("backupFileDeviceId");
     if (backupDeviceIdReply.value().isEmpty()) {
-        SOCIALD_LOG_ERROR("Backup device ID is invalid!");
+        qCWarning(lcSocialPlugin) << "Backup device ID is invalid!";
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -139,8 +137,8 @@ void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString 
         QDBusReply<QString> createBackupReply =
                 m_sailfishBackup->call("createBackupForSyncProfile", m_accountSyncProfile->name());
         if (!createBackupReply.isValid() || createBackupReply.value().isEmpty()) {
-            SOCIALD_LOG_ERROR("Call to createBackupForSyncProfile() failed:" << createBackupReply.error().name()
-                              << createBackupReply.error().message());
+            qCWarning(lcSocialPlugin) << "Call to createBackupForSyncProfile() failed:" << createBackupReply.error().name()
+                              << createBackupReply.error().message();
             setStatus(SocialNetworkSyncAdaptor::Error);
             return;
         }
@@ -160,7 +158,7 @@ void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString 
     {
         const QString filePath = m_accountSyncProfile->key(QStringLiteral("sfos-backuprestore-file"));
         if (filePath.isEmpty()) {
-            SOCIALD_LOG_ERROR("No remote file has been set!");
+            qCWarning(lcSocialPlugin) << "No remote file has been set!";
             setStatus(SocialNetworkSyncAdaptor::Error);
             return;
         }
@@ -169,8 +167,8 @@ void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString 
 
         QDir localDir;
         if (!localDir.mkpath(m_localFileInfo.absolutePath())) {
-            SOCIALD_LOG_ERROR("Could not create local backup directory:" << m_localFileInfo.absolutePath()
-                              << "for OneDrive account:" << accountId);
+            qCWarning(lcSocialPlugin) << "Could not create local backup directory:" << m_localFileInfo.absolutePath()
+                              << "for OneDrive account:" << accountId;
             setStatus(SocialNetworkSyncAdaptor::Error);
             return;
         }
@@ -179,7 +177,7 @@ void OneDriveBackupOperationSyncAdaptor::beginSync(int accountId, const QString 
         break;
     }
     default:
-        SOCIALD_LOG_ERROR("Unrecognized sync operation: " + operation());
+        qCWarning(lcSocialPlugin) << "Unrecognized sync operation: " + operation();
         setStatus(SocialNetworkSyncAdaptor::Error);
         break;
     }
@@ -191,12 +189,12 @@ void OneDriveBackupOperationSyncAdaptor::cloudBackupStatusChanged(int accountId,
         return;
     }
 
-    SOCIALD_LOG_DEBUG("Backup status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+    qCDebug(lcSocialPlugin) << "Backup status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath();
 
     if (status == QLatin1String("UploadingBackup")) {
 
         if (!m_localFileInfo.exists()) {
-            SOCIALD_LOG_ERROR("Backup finished, but cannot find the backup file:" << m_localFileInfo.absoluteFilePath());
+            qCWarning(lcSocialPlugin) << "Backup finished, but cannot find the backup file:" << m_localFileInfo.absoluteFilePath();
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(m_accountId);
             return;
@@ -206,12 +204,12 @@ void OneDriveBackupOperationSyncAdaptor::cloudBackupStatusChanged(int accountId,
         decrementSemaphore(m_accountId);
 
     } else if (status == QLatin1String("Canceled")) {
-        SOCIALD_LOG_ERROR("Cloud backup was canceled");
+        qCWarning(lcSocialPlugin) << "Cloud backup was canceled";
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(m_accountId);
 
     } else if (status == QLatin1String("Error")) {
-        SOCIALD_LOG_ERROR("Failed to create backup file:" << m_localFileInfo.absoluteFilePath());
+        qCWarning(lcSocialPlugin) << "Failed to create backup file:" << m_localFileInfo.absoluteFilePath();
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(m_accountId);
     }
@@ -223,7 +221,7 @@ void OneDriveBackupOperationSyncAdaptor::cloudBackupError(int accountId, const Q
         return;
     }
 
-    SOCIALD_LOG_ERROR("Cloud backup error was:" << error << errorString);
+    qCWarning(lcSocialPlugin) << "Cloud backup error was:" << error << errorString;
     setStatus(SocialNetworkSyncAdaptor::Error);
     decrementSemaphore(m_accountId);
 }
@@ -234,15 +232,15 @@ void OneDriveBackupOperationSyncAdaptor::cloudRestoreStatusChanged(int accountId
         return;
     }
 
-    SOCIALD_LOG_DEBUG("Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath());
+    qCDebug(lcSocialPlugin) << "Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath();
 
     if (status == QLatin1String("Canceled")) {
-        SOCIALD_LOG_ERROR("Cloud backup restore was canceled");
+        qCWarning(lcSocialPlugin) << "Cloud backup restore was canceled";
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(m_accountId);
 
     } else if (status == QLatin1String("Error")) {
-        SOCIALD_LOG_ERROR("Cloud backup restore failed");
+        qCWarning(lcSocialPlugin) << "Cloud backup restore failed";
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(m_accountId);
     }
@@ -254,13 +252,13 @@ void OneDriveBackupOperationSyncAdaptor::cloudRestoreError(int accountId, const 
         return;
     }
 
-    SOCIALD_LOG_ERROR("Cloud backup restore error was:" << error << errorString);
+    qCWarning(lcSocialPlugin) << "Cloud backup restore error was:" << error << errorString;
 }
 
 void OneDriveBackupOperationSyncAdaptor::beginListOperation(int accountId, const QString &accessToken, const QString &remoteDirPath)
 {
     if (remoteDirPath.isEmpty()) {
-        SOCIALD_LOG_ERROR("Cannot fetch directory listing, remote path path set");
+        qCWarning(lcSocialPlugin) << "Cannot fetch directory listing, remote path path set";
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -286,7 +284,7 @@ void OneDriveBackupOperationSyncAdaptor::beginListOperation(int accountId, const
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply, 10 * 60 * 1000); // 10 minutes
     } else {
-        SOCIALD_LOG_ERROR("unable to start directory listing request for OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to start directory listing request for OneDrive account with id" << accountId;
     }
 }
 
@@ -303,7 +301,7 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
 
     if (isError) {
         // Show error but don't set error status until error code is checked more thoroughly.
-        SOCIALD_LOG_ERROR("error occurred when performing Backup remote path request for OneDrive account" << accountId);
+        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote path request for OneDrive account" << accountId;
         debugDumpResponse(data);
     }
 
@@ -314,7 +312,7 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
     if (!ok || entries.isEmpty()) {
         QString errorMessage = parsed.value("error").toString();
         if (!errorMessage.isEmpty()) {
-            SOCIALD_LOG_ERROR("OneDrive returned error message:" << errorMessage);
+            qCWarning(lcSocialPlugin) << "OneDrive returned error message:" << errorMessage;
             errorMessage.clear();
         }
 
@@ -329,9 +327,9 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
         }
 
         if (errorMessage.isEmpty()) {
-            SOCIALD_LOG_DEBUG("Completed directory listing for account:" << accountId);
+            qCDebug(lcSocialPlugin) << "Completed directory listing for account:" << accountId;
         } else {
-            SOCIALD_LOG_ERROR(errorMessage);
+            qCWarning(lcSocialPlugin) << errorMessage;
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
             return;
@@ -339,22 +337,22 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
     }
 
     if (entries.isEmpty()) {
-        SOCIALD_LOG_DEBUG("No entries found in dir listing, but not an error (e.g. maybe file was deleted on server)");
+        qCDebug(lcSocialPlugin) << "No entries found in dir listing, but not an error (e.g. maybe file was deleted on server)";
         debugDumpResponse(data);
     } else {
-        SOCIALD_LOG_DEBUG("Parsed dir listing entries:" << entries);
+        qCDebug(lcSocialPlugin) << "Parsed dir listing entries:" << entries;
     }
 
     QStringList dirListing;
     for (const QJsonValue &child : entries) {
         const QString childName = child.toObject().value("name").toString();
         if (child.toObject().keys().contains("folder")) {
-            SOCIALD_LOG_DEBUG("ignoring folder:" << childName << "under remote backup path:" << remotePath
-                              << "for account:" << accountId);
+            qCDebug(lcSocialPlugin) << "ignoring folder:" << childName << "under remote backup path:" << remotePath
+                              << "for account:" << accountId;
         } else {
-            SOCIALD_LOG_DEBUG("found remote backup object:" << childName
+            qCDebug(lcSocialPlugin) << "found remote backup object:" << childName
                               << "for account:" << accountId
-                              << "under remote backup path:" << remotePath);
+                              << "under remote backup path:" << remotePath;
             dirListing.append(remotePath + '/' + childName);
         }
     }
@@ -362,10 +360,10 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
     QDBusReply<void> setCloudBackupsReply =
             m_sailfishBackup->call("setCloudBackups", m_accountSyncProfile->name(), dirListing);
     if (!setCloudBackupsReply.isValid()) {
-        SOCIALD_LOG_DEBUG("Call to setCloudBackups() failed:" << setCloudBackupsReply.error().name()
-                          << setCloudBackupsReply.error().message());
+        qCDebug(lcSocialPlugin) << "Call to setCloudBackups() failed:" << setCloudBackupsReply.error().name()
+                          << setCloudBackupsReply.error().message();
     } else {
-        SOCIALD_LOG_DEBUG("Wrote directory listing for profile:" << m_accountSyncProfile->name() << dirListing);
+        qCDebug(lcSocialPlugin) << "Wrote directory listing for profile:" << m_accountSyncProfile->name() << dirListing;
     }
     decrementSemaphore(accountId);
 }
@@ -376,7 +374,7 @@ void OneDriveBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const
             ? Buteo::VALUE_TO_REMOTE
             : (operation() == BackupRestore ? Buteo::VALUE_FROM_REMOTE : QString());
     if (direction.isEmpty()) {
-        SOCIALD_LOG_ERROR("Invalid sync operation" << operation() << "for OneDrive account:" << accountId);
+        qCWarning(lcSocialPlugin) << "Invalid sync operation" << operation() << "for OneDrive account:" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -391,7 +389,7 @@ void OneDriveBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const
                                    m_localFileInfo.fileName(),
                                    direction);
     } else {
-        SOCIALD_LOG_ERROR("No direction set for OneDrive Backup sync with account:" << accountId);
+        qCWarning(lcSocialPlugin) << "No direction set for OneDrive Backup sync with account:" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -425,7 +423,7 @@ void OneDriveBackupOperationSyncAdaptor::initialiseAppFolderRequest(int accountI
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply, 10 * 60 * 1000); // 10 minutes
     } else {
-        SOCIALD_LOG_ERROR("unable to create app folder initialisation request for OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to create app folder initialisation request for OneDrive account with id" << accountId;
     }
 }
 
@@ -446,12 +444,12 @@ void OneDriveBackupOperationSyncAdaptor::initialiseAppFolderFinishedHandler()
     QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
 
     if (isError || !ok) {
-        SOCIALD_LOG_ERROR("error occurred when performing initialiseAppFolder request with OneDrive account:" << accountId);
+        qCWarning(lcSocialPlugin) << "error occurred when performing initialiseAppFolder request with OneDrive account:" << accountId;
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
-        SOCIALD_LOG_DEBUG("initialiseAppFolder request succeeded with OneDrive account:" << accountId);
-        SOCIALD_LOG_DEBUG("app folder has remote ID:" << parsed.value("id").toString());
+        qCDebug(lcSocialPlugin) << "initialiseAppFolder request succeeded with OneDrive account:" << accountId;
+        qCDebug(lcSocialPlugin) << "app folder has remote ID:" << parsed.value("id").toString();
 
         // Initialize our list of remote directories to create
         if (syncDirection == Buteo::VALUE_TO_REMOTE) {
@@ -469,7 +467,7 @@ void OneDriveBackupOperationSyncAdaptor::initialiseAppFolderFinishedHandler()
 
             // Read out the app folder remote ID from the response and set it as the parent ID of the first remote dir.
             m_remoteDirectories[0].parentId = parsed.value("id").toString();
-            SOCIALD_LOG_DEBUG("Set the parentId of the first subfolder:" << m_remoteDirectories[0].dirName << "to:" << m_remoteDirectories[0].parentId);
+            qCDebug(lcSocialPlugin) << "Set the parentId of the first subfolder:" << m_remoteDirectories[0].dirName << "to:" << m_remoteDirectories[0].parentId;
 
             // and begin creating the remote directory structure as required, prior to uploading the files.
             // We will create the first (intermediate) remote directory
@@ -483,7 +481,7 @@ void OneDriveBackupOperationSyncAdaptor::initialiseAppFolderFinishedHandler()
             // download the required data.
             requestData(accountId, accessToken, localPath, remotePath, remoteFile);
         } else {
-            SOCIALD_LOG_ERROR("invalid syncDirection specified to initialiseAppFolder request with OneDrive account:" << accountId << ":" << syncDirection);
+            qCWarning(lcSocialPlugin) << "invalid syncDirection specified to initialiseAppFolder request with OneDrive account:" << accountId << ":" << syncDirection;
             setStatus(SocialNetworkSyncAdaptor::Error);
         }
     }
@@ -525,7 +523,7 @@ void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadata(int accountId, 
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply, 10 * 60 * 1000); // 10 minutes
     } else {
-        SOCIALD_LOG_ERROR("unable to perform remote folder metadata request for OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to perform remote folder metadata request for OneDrive account with id" << accountId;
     }
 }
 
@@ -546,15 +544,15 @@ void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadataFinishedHandler(
     QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
 
     if (isError || !ok) {
-        SOCIALD_LOG_ERROR("error occurred when performing remote folder metadata request with OneDrive account:" << accountId);
+        qCWarning(lcSocialPlugin) << "error occurred when performing remote folder metadata request with OneDrive account:" << accountId;
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
-        SOCIALD_LOG_DEBUG("remote folder metadata request succeeded with OneDrive account:" << accountId);
-        SOCIALD_LOG_DEBUG("remote folder:" << parsed.value("name").toString() << "has remote ID:" << parsed.value("id").toString());
+        qCDebug(lcSocialPlugin) << "remote folder metadata request succeeded with OneDrive account:" << accountId;
+        qCDebug(lcSocialPlugin) << "remote folder:" << parsed.value("name").toString() << "has remote ID:" << parsed.value("id").toString();
         debugDumpJsonResponse(data);
         if (!parsed.contains("children")) {
-            SOCIALD_LOG_ERROR("folder metadata request result had no children!");
+            qCWarning(lcSocialPlugin) << "folder metadata request result had no children!";
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
             return;
@@ -570,9 +568,9 @@ void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadataFinishedHandler(
             const QString childName = childObject.value("name").toString();
             const QString childId = childObject.value("id").toString();
             const bool isDir = childObject.keys().contains("folder");
-            SOCIALD_LOG_DEBUG("Looking for:" << remoteDirName << ", checking child object:" << childName << "with id:" << childId << ", isDir?" << isDir);
+            qCDebug(lcSocialPlugin) << "Looking for:" << remoteDirName << ", checking child object:" << childName << "with id:" << childId << ", isDir?" << isDir;
             if (isDir && childName.compare(remoteDirName, Qt::CaseInsensitive) == 0) {
-                SOCIALD_LOG_DEBUG("found folder:" << childName << "with remote id:" << childId << "for OneDrive account:" << accountId);
+                qCDebug(lcSocialPlugin) << "found folder:" << childName << "with remote id:" << childId << "for OneDrive account:" << accountId;
                 foundChildFolder = true;
                 bool updatedMetadata = false;
                 for (int i = 0; i < m_remoteDirectories.size(); i++) {
@@ -590,7 +588,7 @@ void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadataFinishedHandler(
                     }
                 }
                 if (!updatedMetadata) {
-                    SOCIALD_LOG_ERROR("could not find remote dir in directory metadata:" << remoteDirName);
+                    qCWarning(lcSocialPlugin) << "could not find remote dir in directory metadata:" << remoteDirName;
                     setStatus(SocialNetworkSyncAdaptor::Error);
                     decrementSemaphore(accountId);
                     return;
@@ -602,7 +600,7 @@ void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadataFinishedHandler(
             }
         }
         if (!foundChildFolder) {
-            SOCIALD_LOG_ERROR("could not find remote dir in folder metadata response:" << remoteDirName);
+            qCWarning(lcSocialPlugin) << "could not find remote dir in folder metadata response:" << remoteDirName;
             setStatus(SocialNetworkSyncAdaptor::Error);
         }
     }
@@ -631,11 +629,11 @@ void OneDriveBackupOperationSyncAdaptor::requestData(int accountId, const QStrin
             queryItems.append(QPair<QString, QString>(QStringLiteral("expand"), QStringLiteral("children")));
             query.setQueryItems(queryItems);
             url.setQuery(query);
-            SOCIALD_LOG_DEBUG("performing directory request:" << url.toString());
+            qCDebug(lcSocialPlugin) << "performing directory request:" << url.toString();
         } else {
             // file request, download its metadata.  That will contain a content URL which we will redirect to.
             url = QUrl(QStringLiteral("%1/%2:/%3/%4").arg(api(), m_remoteAppDir, remotePath, remoteFile));
-            SOCIALD_LOG_DEBUG("performing file request:" << url.toString());
+            qCDebug(lcSocialPlugin) << "performing file request:" << url.toString();
         }
     }
 
@@ -665,8 +663,8 @@ void OneDriveBackupOperationSyncAdaptor::requestData(int accountId, const QStrin
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply, 10 * 60 * 1000); // 10 minutes
     } else {
-        SOCIALD_LOG_ERROR("unable to create download request:" << remotePath << remoteFile << redirectUrl <<
-                          "for OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to create download request:" << remotePath << remoteFile << redirectUrl <<
+                          "for OneDrive account with id" << accountId;
     }
 }
 
@@ -682,7 +680,7 @@ void OneDriveBackupOperationSyncAdaptor::remotePathFinishedHandler()
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
     if (isError) {
-        SOCIALD_LOG_ERROR("error occurred when performing Backup remote path request for OneDrive account" << accountId << ":");
+        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote path request for OneDrive account" << accountId << ":";
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
@@ -692,7 +690,7 @@ void OneDriveBackupOperationSyncAdaptor::remotePathFinishedHandler()
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
     if (!ok || !parsed.contains("children")) {
-        SOCIALD_LOG_ERROR("no backup data exists in reply from OneDrive with account" << accountId << ", got:");
+        qCWarning(lcSocialPlugin) << "no backup data exists in reply from OneDrive with account" << accountId << ", got:";
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
@@ -703,9 +701,9 @@ void OneDriveBackupOperationSyncAdaptor::remotePathFinishedHandler()
     Q_FOREACH (const QJsonValue &child, children) {
         const QString childName = child.toObject().value("name").toString();
         if (child.toObject().keys().contains("folder")) {
-            SOCIALD_LOG_DEBUG("ignoring folder:" << childName << "under remote backup path:" << remotePath << "for OneDrive account:" << accountId);
+            qCDebug(lcSocialPlugin) << "ignoring folder:" << childName << "under remote backup path:" << remotePath << "for OneDrive account:" << accountId;
         } else {
-            SOCIALD_LOG_DEBUG("found remote backup object:" << childName << "for OneDrive account:" << accountId);
+            qCDebug(lcSocialPlugin) << "found remote backup object:" << childName << "for OneDrive account:" << accountId;
             requestData(accountId, accessToken, localPath, remotePath, childName);
         }
     }
@@ -727,7 +725,7 @@ void OneDriveBackupOperationSyncAdaptor::remoteFileFinishedHandler()
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
     if (isError) {
-        SOCIALD_LOG_ERROR("error occurred when performing Backup remote file request for OneDrive account" << accountId << ", got:");
+        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote file request for OneDrive account" << accountId << ", got:";
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
@@ -743,24 +741,24 @@ void OneDriveBackupOperationSyncAdaptor::remoteFileFinishedHandler()
         QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
         redirectUrl = parsed.value("@microsoft.graph.downloadUrl").toString();
         if (!ok || redirectUrl.isEmpty()) {
-            SOCIALD_LOG_ERROR("no content redirect url exists in file metadata for file:" << remoteFile);
+            qCWarning(lcSocialPlugin) << "no content redirect url exists in file metadata for file:" << remoteFile;
             debugDumpJsonResponse(data);
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
             return;
         }
-        SOCIALD_LOG_DEBUG("redirected from:" << remoteFileName << "to:" << redirectUrl);
+        qCDebug(lcSocialPlugin) << "redirected from:" << remoteFileName << "to:" << redirectUrl;
         requestData(accountId, QString(), localPath, remotePath, remoteFile, redirectUrl);
     } else {
         if (data.isEmpty()) {
-            SOCIALD_LOG_INFO("remote file:" << remoteFileName << "is empty; ignoring");
+            qCInfo(lcSocialPlugin) << "remote file:" << remoteFileName << "is empty; ignoring";
         } else {
             const QString filename = QStringLiteral("%1/%2").arg(localPath).arg(remoteFile);
             QFile file(filename);
             file.open(QIODevice::WriteOnly); // TODO: error checking
             file.write(data);
             file.close();
-            SOCIALD_LOG_DEBUG("successfully wrote" << data.size() << "bytes to:" << filename << "from:" << remoteFileName);
+            qCDebug(lcSocialPlugin) << "successfully wrote" << data.size() << "bytes to:" << filename << "from:" << remoteFileName;
         }
     }
 
@@ -789,11 +787,11 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
             }
         }
         if (remoteDir.isEmpty()) {
-            SOCIALD_LOG_ERROR("No remote directory to create, but no file specified for upload - aborting");
+            qCWarning(lcSocialPlugin) << "No remote directory to create, but no file specified for upload - aborting";
             return;
         }
         if (remoteParentId.isEmpty()) {
-            SOCIALD_LOG_ERROR("No remote parent id known for directory:" << remoteDir << "- aborting");
+            qCWarning(lcSocialPlugin) << "No remote parent id known for directory:" << remoteDir << "- aborting";
             return;
         }
 
@@ -812,8 +810,8 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
                           QVariant::fromValue<QString>(QString::fromLatin1("application/json")));
         request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                              QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
-        SOCIALD_LOG_DEBUG("Attempting to create the remote directory:" << intermediatePath << "via request:" << url.toString());
-        SOCIALD_LOG_DEBUG("with data:" << createFolderJson);
+        qCDebug(lcSocialPlugin) << "Attempting to create the remote directory:" << intermediatePath << "via request:" << url.toString();
+        qCDebug(lcSocialPlugin) << "with data:" << createFolderJson;
 
         reply = m_networkAccessManager->post(request, data);
 
@@ -832,9 +830,9 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
                           QVariant::fromValue<QString>(QString::fromLatin1("application/json")));
         request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                          QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
-        SOCIALD_LOG_DEBUG("Creating upload session for remote file:"
+        qCDebug(lcSocialPlugin) << "Creating upload session for remote file:"
                           << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
-                          << "via request:" << url.toString());
+                          << "via request:" << url.toString();
         reply = m_networkAccessManager->post(request, data);
 
     } else {
@@ -845,8 +843,8 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
             m_uploadFile = new QFile(m_localFileInfo.filePath());
             m_nextFileUploadPos = 0;
             if (!m_uploadFile->open(QIODevice::ReadOnly)){
-                SOCIALD_LOG_ERROR("unable to open local file:" << m_localFileInfo.filePath()
-                                  << "for upload to OneDrive Backup with account:" << accountId);
+                qCWarning(lcSocialPlugin) << "unable to open local file:" << m_localFileInfo.filePath()
+                                  << "for upload to OneDrive Backup with account:" << accountId;
                 return;
             }
         }
@@ -864,9 +862,9 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         req.setRawHeader(QByteArrayLiteral("Content-Range"), contentRange.toLatin1());
         req.setRawHeader(QByteArrayLiteral("Authorization"),
                          QByteArrayLiteral("Bearer ") + accessToken.toUtf8());
-        SOCIALD_LOG_DEBUG("Attempting to upload" << contentRange << "of file:"
+        qCDebug(lcSocialPlugin) << "Attempting to upload" << contentRange << "of file:"
                           << m_localFileInfo.filePath()
-                          << "via request:" << url.toString());
+                          << "via request:" << url.toString();
         reply = m_networkAccessManager->put(req, data);
     }
 
@@ -892,8 +890,8 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply, 10 * 60 * 1000); // 10 minutes
     } else {
-        SOCIALD_LOG_ERROR("unable to create upload request:" << localPath << localFile << "->" << remotePath <<
-                          "for OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to create upload request:" << localPath << localFile << "->" << remotePath <<
+                          "for OneDrive account with id" << accountId;
     }
 }
 
@@ -913,10 +911,10 @@ void OneDriveBackupOperationSyncAdaptor::createRemotePathFinishedHandler()
     if (isError) {
         if (httpCode == 409) {
             // we actually expect a conflict error if the folder already existed, which is fine.
-            SOCIALD_LOG_DEBUG("remote path creation had conflict: already exists:" << intermediatePath << ".  Continuing.");
+            qCDebug(lcSocialPlugin) << "remote path creation had conflict: already exists:" << intermediatePath << ".  Continuing.";
         } else {
             // this must be a real error.
-            SOCIALD_LOG_ERROR("remote path creation failed:" << httpCode);
+            qCWarning(lcSocialPlugin) << "remote path creation failed:" << httpCode;
             debugDumpJsonResponse(data);
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(accountId);
@@ -933,8 +931,8 @@ void OneDriveBackupOperationSyncAdaptor::createRemotePathFinishedHandler()
             createdDirectoryParentFolderId = m_remoteDirectories[i].parentId;
             createdDirectoryName = m_remoteDirectories[i].dirName;
         } else {
-            SOCIALD_LOG_DEBUG("successfully created folder:" << createdDirectoryName << ", now performing parent request to get its remote id");
-            SOCIALD_LOG_DEBUG("need to create another remote directory:" << m_remoteDirectories[i].dirName << "with parent:" << m_remoteDirectories[i].parentPath);
+            qCDebug(lcSocialPlugin) << "successfully created folder:" << createdDirectoryName << ", now performing parent request to get its remote id";
+            qCDebug(lcSocialPlugin) << "need to create another remote directory:" << m_remoteDirectories[i].dirName << "with parent:" << m_remoteDirectories[i].parentPath;
             // first, get the metadata for the most recently created path's parent, to get its remote ID.
             // after that's done, the next intermediate directory can be created.
             // NOTE: we do this (rather than attempting to parse the folder id from the response in this function)
@@ -947,11 +945,11 @@ void OneDriveBackupOperationSyncAdaptor::createRemotePathFinishedHandler()
     }
 
     // upload all files from the local path to the remote server.
-    SOCIALD_LOG_DEBUG("remote path now exists, attempting to upload local files");
+    qCDebug(lcSocialPlugin) << "remote path now exists, attempting to upload local files";
     QDir dir(localPath);
     QStringList localFiles = dir.entryList(QDir::Files);
     Q_FOREACH (const QString &localFile, localFiles) {
-        SOCIALD_LOG_DEBUG("uploading file:" << localFile << "from" << localPath << "to:" << remotePath);
+        qCDebug(lcSocialPlugin) << "uploading file:" << localFile << "from" << localPath << "to:" << remotePath;
         uploadData(accountId, accessToken, localPath, remotePath, localFile);
     }
     decrementSemaphore(accountId);
@@ -975,18 +973,18 @@ void OneDriveBackupOperationSyncAdaptor::createUploadSessionFinishedHandler()
     const QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
     const QString uploadSessionUrl = parsed.value("uploadUrl").toString();
     if (isError || !ok || uploadSessionUrl.isEmpty()) {
-        SOCIALD_LOG_ERROR("failed to read uploadUrl from createUploadSessionRequest for path" << remotePath
+        qCWarning(lcSocialPlugin) << "failed to read uploadUrl from createUploadSessionRequest for path" << remotePath
                           << "to upload file" << localPath << localFile
                           << "for OneDrive account:" << accountId << ", code:" << httpCode
-                          << "response:" << data);
+                          << "response:" << data;
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
         m_uploadSessionUrl = uploadSessionUrl;
 
-        SOCIALD_LOG_DEBUG("successfully created upload session to upload to:" << m_uploadSessionUrl
+        qCDebug(lcSocialPlugin) << "successfully created upload session to upload to:" << m_uploadSessionUrl
                           << localPath << localFile << "to:" << remotePath
-                          << "for OneDrive account:" << accountId);
+                          << "for OneDrive account:" << accountId;
         uploadData(accountId, accessToken, localPath, remotePath, localFile);
     }
 
@@ -1010,8 +1008,8 @@ void OneDriveBackupOperationSyncAdaptor::filePartUploadFinishedHandler()
     int nextRangeStart = 0;
 
     if (httpCode == 200 || httpCode == 201) { // OK or Created
-        SOCIALD_LOG_DEBUG("successfully uploaded backup of file:" << localPath << localFile << "to:" << remotePath <<
-                          "for OneDrive account:" << accountId);
+        qCDebug(lcSocialPlugin) << "successfully uploaded backup of file:" << localPath << localFile << "to:" << remotePath <<
+                          "for OneDrive account:" << accountId;
     } else if (httpCode == 202) {   // Accepted
         bool ok = false;
         const QJsonObject parsed = parseJsonObjectReplyData(data, &ok);
@@ -1027,18 +1025,18 @@ void OneDriveBackupOperationSyncAdaptor::filePartUploadFinishedHandler()
         }
 
         if (nextRangeStart == 0) {
-            SOCIALD_LOG_ERROR("Cannot find nextExpectedRanges data to upload next part of"
+            qCWarning(lcSocialPlugin) << "Cannot find nextExpectedRanges data to upload next part of"
                               << m_localFileInfo.filePath() << "to" << remotePath
                               << "for OneDrive account:" << accountId << ", code:" << httpCode
-                              << "response:" << data);
+                              << "response:" << data;
             debugDumpJsonResponse(data);
             setStatus(SocialNetworkSyncAdaptor::Error);
         }
 
     } else {
-        SOCIALD_LOG_ERROR("failed to backup file:" << localPath << localFile << "to:" << remotePath <<
+        qCWarning(lcSocialPlugin) << "failed to backup file:" << localPath << localFile << "to:" << remotePath <<
                           "for OneDrive account:" << accountId << ", code:" << httpCode
-                          << "response:" << data);
+                          << "response:" << data;
         debugDumpJsonResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
     }
@@ -1062,9 +1060,9 @@ void OneDriveBackupOperationSyncAdaptor::downloadProgressHandler(qint64 bytesRec
     QString localPath = reply->property("localPath").toString();
     QString remotePath = reply->property("remotePath").toString();
     QString localFile = reply->property("localFile").toString();
-    SOCIALD_LOG_DEBUG("Have download progress: bytesReceived:" << bytesReceived <<
+    qCDebug(lcSocialPlugin) << "Have download progress: bytesReceived:" << bytesReceived <<
                       "of" << bytesTotal << ", for" << localPath << localFile <<
-                      "from" << remotePath << "with account:" << accountId);
+                      "from" << remotePath << "with account:" << accountId;
 }
 
 void OneDriveBackupOperationSyncAdaptor::uploadProgressHandler(qint64 bytesSent, qint64 bytesTotal)
@@ -1074,17 +1072,17 @@ void OneDriveBackupOperationSyncAdaptor::uploadProgressHandler(qint64 bytesSent,
     QString localPath = reply->property("localPath").toString();
     QString remotePath = reply->property("remotePath").toString();
     QString localFile = reply->property("localFile").toString();
-    SOCIALD_LOG_DEBUG("Have upload progress: bytesSent:" << bytesSent <<
+    qCDebug(lcSocialPlugin) << "Have upload progress: bytesSent:" << bytesSent <<
                       "of" << bytesTotal << ", for" << localPath << localFile <<
-                      "to" << remotePath << "with account:" << accountId);
+                      "to" << remotePath << "with account:" << accountId;
 }
 
 void OneDriveBackupOperationSyncAdaptor::finalize(int accountId)
 {
-    SOCIALD_LOG_DEBUG("Finalize OneDrive backup sync for account" << accountId);
+    qCDebug(lcSocialPlugin) << "Finalize OneDrive backup sync for account" << accountId;
 
     if (operation() == Backup) {
-        SOCIALD_LOG_DEBUG("Deleting created backup file" << m_localFileInfo.absoluteFilePath());
+        qCDebug(lcSocialPlugin) << "Deleting created backup file" << m_localFileInfo.absoluteFilePath();
         QFile::remove(m_localFileInfo.absoluteFilePath());
         QDir().rmdir(m_localFileInfo.absolutePath());
     }

@@ -118,7 +118,7 @@ QString OneDriveImageSyncAdaptor::syncServiceName() const
 void OneDriveImageSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 {
     if (!initRemovalDetectionLists(accountId)) {
-        SOCIALD_LOG_ERROR("unable to initialized cached account list for account" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to initialized cached account list for account" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -147,9 +147,9 @@ void OneDriveImageSyncAdaptor::beginSync(int accountId, const QString &accessTok
 void OneDriveImageSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit database changes";
     } else if (m_userId.isEmpty()) {
-        SOCIALD_LOG_ERROR("no user id determined during sync, aborting");
+        qCWarning(lcSocialPlugin) << "no user id determined during sync, aborting";
     } else {
         // Add user
         if (m_db.user(m_userId).isNull()) {
@@ -205,7 +205,7 @@ void OneDriveImageSyncAdaptor::requestResource(int accountId, const QString &acc
                              .arg(api()).arg("/me").arg(resourceTarget.isEmpty()
                                                         ? defaultResourceTarget
                                                         : resourceTarget));
-    SOCIALD_LOG_DEBUG("OneDrive image sync requesting resource:" << url.toString());
+    qCDebug(lcSocialPlugin) << "OneDrive image sync requesting resource:" << url.toString();
     QNetworkRequest req(url);
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                      QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
@@ -222,14 +222,14 @@ void OneDriveImageSyncAdaptor::requestResource(int accountId, const QString &acc
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request data from OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request data from OneDrive account with id" << accountId;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
     }
 }
 
 void OneDriveImageSyncAdaptor::requestNextLink(int accountId, const QString &accessToken, const QString &nextLink, bool isDefaultResource)
 {
-    SOCIALD_LOG_DEBUG("OneDrive image sync requesting nextlink resources:" << nextLink);
+    qCDebug(lcSocialPlugin) << "OneDrive image sync requesting nextlink resources:" << nextLink;
     QUrl nextLinkUrl(nextLink);
     QNetworkRequest req(nextLinkUrl);
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
@@ -247,7 +247,7 @@ void OneDriveImageSyncAdaptor::requestNextLink(int accountId, const QString &acc
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request data from OneDrive account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request data from OneDrive account with id" << accountId;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
     }
 }
@@ -267,8 +267,8 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
     bool ok = false;
     const QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
     if (isError || !ok || !parsed.contains(QLatin1String("id"))) {
-        SOCIALD_LOG_ERROR("Unable to parse query response for OneDrive account with id" << accountId);
-        SOCIALD_LOG_DEBUG("Received response data:" << replyData);
+        qCWarning(lcSocialPlugin) << "Unable to parse query response for OneDrive account with id" << accountId;
+        qCDebug(lcSocialPlugin) << "Received response data:" << replyData;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         decrementSemaphore(accountId);
         return;
@@ -279,14 +279,14 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
         m_userDisplayName = userObj.value("displayName").toString();
         m_userId = userObj.value("id").toString();
         if (m_userId.isEmpty()) {
-            SOCIALD_LOG_DEBUG("Unable to determine user id for default resource, aborting");
+            qCDebug(lcSocialPlugin) << "Unable to determine user id for default resource, aborting";
             decrementSemaphore(accountId);
             return;
         }
         m_db.syncAccount(accountId, m_userId);
     } else if (m_userId != userObj.value("id").toString()) {
         // ignore this album, not created by the current user.
-        SOCIALD_LOG_DEBUG("Ignoring album" << parsed.value("name").toString() << " - different user.");
+        qCDebug(lcSocialPlugin) << "Ignoring album" << parsed.value("name").toString() << " - different user.";
         decrementSemaphore(accountId);
         return;
     }
@@ -305,7 +305,7 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
         if (child.contains("folder")) {
             const QJsonObject parentReference = child.value("parentReference").toObject();
             const QString onedriveResourceTarget = QStringLiteral("%1/%2").arg(parentReference.value("path").toString(), child.value("name").toString());
-            SOCIALD_LOG_DEBUG("Found subfolder:" << child.value("name").toString() << "of folder:" << albumName);
+            qCDebug(lcSocialPlugin) << "Found subfolder:" << child.value("name").toString() << "of folder:" << albumName;
             requestResource(accountId, accessToken, onedriveResourceTarget);
         } else if (child.contains("image") && child.contains("@microsoft.graph.downloadUrl")) {
             photoCount++;
@@ -334,7 +334,7 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
                     || dbImage->createdTime().toTime_t() < photoCreatedTime.toTime_t()
                     || dbImage->updatedTime().toTime_t() < photoUpdatedTime.toTime_t()) {
                 // changed, need to update in our local db.
-                SOCIALD_LOG_DEBUG("Image:" << photoName << "in folder:" << albumName << "added or changed on server");
+                qCDebug(lcSocialPlugin) << "Image:" << photoName << "in folder:" << albumName << "added or changed on server";
                 m_imageData.insert(photoId, image);
             }
         }
@@ -344,10 +344,10 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
     m_cachedAlbums.remove(albumId); // Removal detection
     m_seenAlbums.insert(albumId);
     if (!dbAlbum.isNull() && (dbAlbum->updatedTime().toTime_t() >= updatedTime.toTime_t())) {
-        SOCIALD_LOG_DEBUG("album with id" << albumId << "by user" << m_userId <<
-                          "from OneDrive account with id" << accountId << "doesn't need update");
+        qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << m_userId <<
+                          "from OneDrive account with id" << accountId << "doesn't need update";
     } else {
-        SOCIALD_LOG_DEBUG("Album:" << albumName << "added or changed on server");
+        qCDebug(lcSocialPlugin) << "Album:" << albumName << "added or changed on server";
         const AlbumData album(albumId, m_userId, createdTime, updatedTime, albumName, photoCount);
         if (m_albumData.contains(albumId)) {
             // updating due to nextlink / continuation request

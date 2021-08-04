@@ -171,18 +171,18 @@ bool SocialdButeoPlugin::startSync()
     // purging any synced data associated with those accounts).
     if (m_socialNetworkSyncAdaptor && m_socialNetworkSyncAdaptor->enabled()) {
         if (m_socialNetworkSyncAdaptor->status() == SocialNetworkSyncAdaptor::Inactive) {
-            SOCIALD_LOG_DEBUG("performing sync of" << m_dataTypeName <<
+            qCDebug(lcSocialPlugin) << "performing sync of" << m_dataTypeName <<
                               "from" << m_socialServiceName <<
-                              "for account" << m_profileAccountId);
+                              "for account" << m_profileAccountId;
             m_socialNetworkSyncAdaptor->sync(m_dataTypeName, m_profileAccountId);
             return true;
         } else {
-            SOCIALD_LOG_DEBUG(m_socialServiceName << "sync adaptor for" <<
+            qCDebug(lcSocialPlugin) << m_socialServiceName << "sync adaptor for" <<
                               m_dataTypeName << "is still busy with last sync of account" <<
-                              m_profileAccountId);
+                              m_profileAccountId;
         }
     } else {
-        SOCIALD_LOG_DEBUG("no enabled" << m_socialServiceName << "sync adaptor for" << m_dataTypeName);
+        qCDebug(lcSocialPlugin) << "no enabled" << m_socialServiceName << "sync adaptor for" << m_dataTypeName;
     }
     return false;
 }
@@ -190,7 +190,7 @@ bool SocialdButeoPlugin::startSync()
 void SocialdButeoPlugin::abortSync(Sync::SyncStatus status)
 {
     // note: it seems buteo automatically calls abortSync on network connectivity loss...
-    SOCIALD_LOG_INFO("aborting sync with status:" << status);
+    qCInfo(lcSocialPlugin) << "aborting sync with status:" << status;
     m_socialNetworkSyncAdaptor->abortSync(status);
 }
 
@@ -219,7 +219,7 @@ void SocialdButeoPlugin::connectivityStateChanged(Sync::ConnectivityType type, b
 {
     // See TransportTracker.cpp:149 for example
     // Sync::CONNECTIVITY_INTERNET, true|false
-    SOCIALD_LOG_INFO("notified of connectivity change:" << type << state);
+    qCInfo(lcSocialPlugin) << "notified of connectivity change:" << type << state;
     if (type == Sync::CONNECTIVITY_INTERNET && state == false) {
         // we lost connectivity during sync.
         abortSync(Sync::SYNC_CONNECTION_ERROR);
@@ -297,15 +297,15 @@ QList<Buteo::SyncProfile*> SocialdButeoPlugin::ensurePerAccountSyncProfilesExist
 
         if (!foundProfile) {
             // it should have been generated for the account when the account was added.
-            SOCIALD_LOG_INFO("no per-account" << profile().name() <<
-                             "sync profile exists for account:" << currAccount->id());
+            qCInfo(lcSocialPlugin) << "no per-account" << profile().name() <<
+                             "sync profile exists for account:" << currAccount->id();
 
             // create the per-account profile... we shouldn't need to do this...
             QString profileName = createProfile(&m_profileManager, profile().name(), currAccount, dataTypeSyncService, true, QVariantMap());
             Buteo::SyncProfile *newProfile = m_profileManager.syncProfile(profileName);
             if (!newProfile) {
-                SOCIALD_LOG_ERROR("unable to create per-account" << profile().name() <<
-                                  "sync profile for account:" << currAccount->id());
+                qCWarning(lcSocialPlugin) << "unable to create per-account" << profile().name() <<
+                                  "sync profile for account:" << currAccount->id();
             } else {
                 // enable the sync schedule for the profile.
                 Buteo::SyncSchedule schedule = newProfile->syncSchedule();

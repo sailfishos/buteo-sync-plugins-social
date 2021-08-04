@@ -22,11 +22,9 @@
 #ifndef TRACE_H
 #define TRACE_H
 
-#include "buteosyncfw_p.h"
+#include <QLoggingCategory>
 
-#define SOCIALD_LOG_TRACE(message)   LOG_TRACE("trace: "   << message) /* MSYNCD_LOGGING_LEVEL >= 8 */
-#define SOCIALD_LOG_DEBUG(message)   LOG_DEBUG("debug: "   << message) /* MSYNCD_LOGGING_LEVEL >= 7 */
-#define SOCIALD_LOG_INFO(message)    LOG_INFO("info : "    << message) /* MSYNCD_LOGGING_LEVEL >= 6 */
-#define SOCIALD_LOG_ERROR(message)   LOG_WARNING("ERROR: " << message) /* MSYNCD_LOGGING_LEVEL == * */
+Q_DECLARE_LOGGING_CATEGORY(lcSocialPlugin)
+Q_DECLARE_LOGGING_CATEGORY(lcSocialPluginTrace)
 
 #endif // TRACE_H

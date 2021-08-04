@@ -59,7 +59,7 @@ QDate jsonObjectToDate(const QJsonObject &object, bool *ok)
 
     QDate date(year, month, day);
     if (!date.isValid()) {
-        SOCIALD_LOG_ERROR("Cannot read date from JSON:" << object);
+        qCWarning(lcSocialPlugin) << "Cannot read date from JSON:" << object;
     }
     if (ok) {
         *ok = date.isValid();
@@ -150,7 +150,7 @@ bool removeDetails(QContact *contact)
     for (int i = 0; i < details.count(); ++i) {
         T *detail = &details[i];
         if (!contact->removeDetail(detail)) {
-            SOCIALD_LOG_ERROR("Unable to remove detail:" << detail);
+            qCWarning(lcSocialPlugin) << "Unable to remove detail:" << detail;
             return false;
         }
     }
@@ -970,8 +970,8 @@ bool GooglePeople::Photo::saveContactDetails(QContact *contact, const QList<Phot
         QContactAvatar avatar;
         const QString localFilePath = GoogleContactImageDownloader::staticOutputFile(guid, photo.url);
         if (localFilePath.isEmpty()) {
-            SOCIALD_LOG_ERROR("Cannot generate local file name for avatar url:" << photo.url
-                              << "for contact:" << guid);
+            qCWarning(lcSocialPlugin) << "Cannot generate local file name for avatar url:" << photo.url
+                              << "for contact:" << guid;
             continue;
         }
 
@@ -1083,7 +1083,7 @@ bool GooglePeople::Person::saveToContact(QContact *contact,
                                          const QList<QContactCollection> &candidateCollections) const
 {
     if (!contact) {
-        SOCIALD_LOG_ERROR("saveToContact() failed: invalid contact!");
+        qCWarning(lcSocialPlugin) << "saveToContact() failed: invalid contact!";
         return false;
     }
 

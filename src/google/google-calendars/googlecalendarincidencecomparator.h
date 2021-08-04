@@ -37,18 +37,16 @@
 
 #include "trace.h"
 
-#define SOCIALD_LOG_DEBUG_MAYBE(msg) if (printDebug) SOCIALD_LOG_DEBUG(msg)
-
 #define GIC_RETURN_FALSE_IF_NOT_EQUAL(a, b, func, desc) {\
     if (a->func != b->func) {\
-        SOCIALD_LOG_DEBUG_MAYBE("Incidence" << desc << "" << "properties are not equal:" << a->func << b->func); \
+        qCDebug(lcSocialPlugin) << "Incidence" << desc << "" << "properties are not equal:" << a->func << b->func; \
         return false;\
     }\
 }
 
 #define GIC_RETURN_FALSE_IF_NOT_EQUAL_CUSTOM(failureCheck, desc, debug) {\
     if (failureCheck) {\
-        SOCIALD_LOG_DEBUG_MAYBE("Incidence" << desc << "properties are not equal:" << desc << debug); \
+        qCDebug(lcSocialPlugin) << "Incidence" << desc << "properties are not equal:" << desc << debug; \
         return false;\
     }\
 }
@@ -76,7 +74,7 @@ namespace GoogleCalendarIncidenceComparator {
         return true;
     }
 
-    bool eventsEqual(const KCalendarCore::Event::Ptr &a, const KCalendarCore::Event::Ptr &b, bool printDebug)
+    bool eventsEqual(const KCalendarCore::Event::Ptr &a, const KCalendarCore::Event::Ptr &b)
     {
         GIC_RETURN_FALSE_IF_NOT_EQUAL_CUSTOM(a->dateEnd() != b->dateEnd(), "dateEnd", (a->dateEnd().toString() + " != " + b->dateEnd().toString()));
         GIC_RETURN_FALSE_IF_NOT_EQUAL(a, b, transparency(), "transparency");
@@ -92,9 +90,9 @@ namespace GoogleCalendarIncidenceComparator {
         if (a->allDay() && b->allDay()) {
             // here we assume that both events are in "export form" (that is, exclusive DTEND)
             if (a->dtEnd().date() != b->dtEnd().date()) {
-                SOCIALD_LOG_DEBUG_MAYBE("have a->dtStart()" << a->dtStart().toString() << ", a->dtEnd()" << a->dtEnd().toString());
-                SOCIALD_LOG_DEBUG_MAYBE("have b->dtStart()" << b->dtStart().toString() << ", b->dtEnd()" << b->dtEnd().toString());
-                SOCIALD_LOG_DEBUG_MAYBE("have a->isMultiDay()" << a->isMultiDay() << ", b->isMultiDay()" << b->isMultiDay());
+                qCDebug(lcSocialPlugin) << "have a->dtStart()" << a->dtStart().toString() << ", a->dtEnd()" << a->dtEnd().toString();
+                qCDebug(lcSocialPlugin) << "have b->dtStart()" << b->dtStart().toString() << ", b->dtEnd()" << b->dtEnd().toString();
+                qCDebug(lcSocialPlugin) << "have a->isMultiDay()" << a->isMultiDay() << ", b->isMultiDay()" << b->isMultiDay();
                 return false;
             }
         } else {
@@ -107,7 +105,7 @@ namespace GoogleCalendarIncidenceComparator {
         return true;
     }
 
-    bool todosEqual(const KCalendarCore::Todo::Ptr &a, const KCalendarCore::Todo::Ptr &b, bool printDebug)
+    bool todosEqual(const KCalendarCore::Todo::Ptr &a, const KCalendarCore::Todo::Ptr &b)
     {
         GIC_RETURN_FALSE_IF_NOT_EQUAL(a, b, hasCompletedDate(), "hasCompletedDate");
         GIC_RETURN_FALSE_IF_NOT_EQUAL_CUSTOM(a->dtRecurrence() != b->dtRecurrence(), "dtRecurrence", (a->dtRecurrence().toString() + " != " + b->dtRecurrence().toString()));
@@ -121,14 +119,14 @@ namespace GoogleCalendarIncidenceComparator {
         return true;
     }
 
-    bool journalsEqual(const KCalendarCore::Journal::Ptr &, const KCalendarCore::Journal::Ptr &, bool)
+    bool journalsEqual(const KCalendarCore::Journal::Ptr &, const KCalendarCore::Journal::Ptr &)
     {
         // no journal-specific properties; it only uses the base incidence properties
         return true;
     }
 
     // Checks whether a specific set of properties are equal.
-    bool incidencesEqual(const KCalendarCore::Incidence::Ptr &a, const KCalendarCore::Incidence::Ptr &b, bool printDebug)
+    bool incidencesEqual(const KCalendarCore::Incidence::Ptr &a, const KCalendarCore::Incidence::Ptr &b)
     {
         if (!a || !b) {
             qWarning() << "Invalid paramters! a:" << a << "b:" << b;
@@ -186,23 +184,23 @@ namespace GoogleCalendarIncidenceComparator {
 
         switch (a->type()) {
         case KCalendarCore::IncidenceBase::TypeEvent:
-            if (!eventsEqual(a.staticCast<KCalendarCore::Event>(), b.staticCast<KCalendarCore::Event>(), printDebug)) {
+            if (!eventsEqual(a.staticCast<KCalendarCore::Event>(), b.staticCast<KCalendarCore::Event>())) {
                 return false;
             }
             break;
         case KCalendarCore::IncidenceBase::TypeTodo:
-            if (!todosEqual(a.staticCast<KCalendarCore::Todo>(), b.staticCast<KCalendarCore::Todo>(), printDebug)) {
+            if (!todosEqual(a.staticCast<KCalendarCore::Todo>(), b.staticCast<KCalendarCore::Todo>())) {
                 return false;
             }
             break;
         case KCalendarCore::IncidenceBase::TypeJournal:
-            if (!journalsEqual(a.staticCast<KCalendarCore::Journal>(), b.staticCast<KCalendarCore::Journal>(), printDebug)) {
+            if (!journalsEqual(a.staticCast<KCalendarCore::Journal>(), b.staticCast<KCalendarCore::Journal>())) {
                 return false;
             }
             break;
         case KCalendarCore::IncidenceBase::TypeFreeBusy:
         case KCalendarCore::IncidenceBase::TypeUnknown:
-            SOCIALD_LOG_DEBUG_MAYBE("Unable to compare FreeBusy or Unknown incidence, assuming equal");
+            qCDebug(lcSocialPlugin) << "Unable to compare FreeBusy or Unknown incidence, assuming equal";
             break;
         }
         return true;

@@ -47,9 +47,9 @@ void VKNotificationSyncAdaptor::finalize(int accountId)
 {
     Q_UNUSED(accountId);
     if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("sync aborted, skipping finalize of VK Notifications from account:" << accountId);
+        qCDebug(lcSocialPlugin) << "sync aborted, skipping finalize of VK Notifications from account:" << accountId;
     } else {
-        SOCIALD_LOG_DEBUG("finalizing VK Notifications sync with account:" << accountId);
+        qCDebug(lcSocialPlugin) << "finalizing VK Notifications sync with account:" << accountId;
         //m_db.purgeOldNotifications(OLD_NOTIFICATION_LIMIT_IN_DAYS); // TODO
         Q_FOREACH (const NotificationData &notification, m_notificationsToAdd) {
             QList<UserProfile> userProfiles;
@@ -67,10 +67,10 @@ void VKNotificationSyncAdaptor::retryThrottledRequest(const QString &request, co
 {
     int accountId = args[0].toInt();
     if (retryLimitReached) {
-        SOCIALD_LOG_ERROR("hit request retry limit! unable to request data from VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "hit request retry limit! unable to request data from VK account with id" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
-        SOCIALD_LOG_DEBUG("retrying Notifications" << request << "request for VK account:" << accountId);
+        qCDebug(lcSocialPlugin) << "retrying Notifications" << request << "request for VK account:" << accountId;
         requestNotifications(accountId, args[1].toString(), args[2].toString(), args[3].toString());
     }
     decrementSemaphore(accountId); // finished waiting for the request.
@@ -136,13 +136,13 @@ void VKNotificationSyncAdaptor::finishedHandler()
             if (!object.isEmpty()) {
                 m_notificationsToAdd.append(NotificationData(accountId, object, profileValues));
             } else {
-                SOCIALD_LOG_DEBUG("notification object empty; skipping");
+                qCDebug(lcSocialPlugin) << "notification object empty; skipping";
             }
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("error: unable to parse notification data from request with account:" << accountId <<
-                          "got:" << QString::fromUtf8(replyData));
+        qCWarning(lcSocialPlugin) << "error: unable to parse notification data from request with account:" << accountId <<
+                          "got:" << QString::fromUtf8(replyData);
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -161,10 +161,10 @@ void VKNotificationSyncAdaptor::saveVKNotificationFromObject(int accountId, cons
         int toId = int(feedbackItemObj.value(QStringLiteral("to_id")).toDouble());
         UserProfile profile = findUserProfile(userProfiles, fromId);
         if (profile.uid != 0) {
-            SOCIALD_LOG_TRACE("adding VK notification:" << type);
+            qCDebug(lcSocialPluginTrace) << "adding VK notification:" << type;
             m_db.addVKNotification(accountId, type, QString::number(fromId), profile.name(), profile.icon, QString::number(toId), timestamp);
         } else {
-            SOCIALD_LOG_DEBUG("no user profile found for owner" << fromId << "of notification from account" << accountId);
+            qCDebug(lcSocialPlugin) << "no user profile found for owner" << fromId << "of notification from account" << accountId;
         }
     }
 }

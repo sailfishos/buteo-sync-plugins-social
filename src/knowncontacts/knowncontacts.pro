@@ -1,5 +1,7 @@
 TARGET = knowncontacts-client
 
+include($$PWD/../common.pri)
+
 knowncontacts_sync_profile.path = /etc/buteo/profiles/sync
 knowncontacts_sync_profile.files = knowncontacts.Contacts.xml
 knowncontacts_client_plugin_xml.path = /etc/buteo/profiles/client

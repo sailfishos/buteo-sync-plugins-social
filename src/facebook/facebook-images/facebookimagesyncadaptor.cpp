@@ -69,12 +69,12 @@ void FacebookImageSyncAdaptor::sync(const QString &dataTypeString, int accountId
 {
     // get ready for sync
     if (!determineOptimalDimensions()) {
-        SOCIALD_LOG_ERROR("unable to determine optimal image dimensions, aborting");
+        qCWarning(lcSocialPlugin) << "unable to determine optimal image dimensions, aborting";
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
     if (!initRemovalDetectionLists(accountId)) {
-        SOCIALD_LOG_ERROR("unable to initialized cached account list for account" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to initialized cached account list for account" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -104,7 +104,7 @@ void FacebookImageSyncAdaptor::finalize(int accountId)
     Q_UNUSED(accountId)
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit database changes";
     } else {
         // Remove albums
         m_db.removeAlbums(m_cachedAlbums.keys());
@@ -124,7 +124,7 @@ void FacebookImageSyncAdaptor::requestData(int accountId,
                                            const QString &fbAlbumId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("skipping data request due to sync abort");
+        qCDebug(lcSocialPlugin) << "skipping data request due to sync abort";
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         return;
     }
@@ -180,7 +180,7 @@ void FacebookImageSyncAdaptor::requestData(int accountId,
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request data from Facebook account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request data from Facebook account with id" << accountId;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
     }
 }
@@ -202,7 +202,7 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
     if (isError || !ok || !parsed.contains(QLatin1String("data"))) {
-        SOCIALD_LOG_ERROR("unable to read albums response for Facebook account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read albums response for Facebook account with id" << accountId;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         decrementSemaphore(accountId);
         return;
@@ -210,7 +210,7 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
 
     QJsonArray data = parsed.value(QLatin1String("data")).toArray();
     if (data.size() == 0) {
-        SOCIALD_LOG_DEBUG("Facebook account with id" << accountId << "has no albums");
+        qCDebug(lcSocialPlugin) << "Facebook account with id" << accountId << "has no albums";
         decrementSemaphore(accountId);
         return;
     }
@@ -238,7 +238,7 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
         QString createdTimeStr = albumObject.value(QLatin1String("created_time")).toString();
         QString updatedTimeStr = albumObject.value(QLatin1String("updated_time")).toString();
         int imageCount = static_cast<int>(albumObject.value(QLatin1String("count")).toDouble());
-        SOCIALD_LOG_DEBUG("Got album information:" << userId << albumId << albumName << createdTimeStr << updatedTimeStr << imageCount);
+        qCDebug(lcSocialPlugin) << "Got album information:" << userId << albumId << albumName << createdTimeStr << updatedTimeStr << imageCount;
 
         // check to see whether we need to sync (any changes since last sync)
         // Note that we also check if the image count is the same, since, when
@@ -250,8 +250,8 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
         m_cachedAlbums.remove(fbAlbumId);  // Removal detection
         if (!dbAlbum.isNull() && (dbAlbum->updatedTime() >= updatedTime
                                   && dbAlbum->imageCount() == imageCount)) {
-            SOCIALD_LOG_DEBUG("album with id" << albumId << "by user" << userId <<
-                              "from Facebook account with id" << accountId << "doesn't need sync");
+            qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << userId <<
+                              "from Facebook account with id" << accountId << "doesn't need sync";
             continue;
         }
 
@@ -271,7 +271,7 @@ void FacebookImageSyncAdaptor::albumsFinishedHandler()
     QString nextUrl = paging.value(QLatin1String("next")).toString();
     if (!nextUrl.isEmpty() && nextUrl != continuationUrl) {
         // note: we check equality because fb can return spurious paging data...
-        SOCIALD_LOG_DEBUG("performing continuation request for more albums for Facebook account with id" << accountId << ":" << nextUrl);
+        qCDebug(lcSocialPlugin) << "performing continuation request for more albums for Facebook account with id" << accountId << ":" << nextUrl;
         requestData(accountId, accessToken, nextUrl, fbUserId, QString());
     }
 
@@ -296,8 +296,8 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
     if (isError || !ok || !parsed.contains(QLatin1String("data"))) {
-        SOCIALD_LOG_ERROR("unable to read photos response for Facebook account with id" << accountId);
-        SOCIALD_LOG_DEBUG(replyData);
+        qCWarning(lcSocialPlugin) << "unable to read photos response for Facebook account with id" << accountId;
+        qCDebug(lcSocialPlugin) << replyData;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         decrementSemaphore(accountId);
         return;
@@ -305,7 +305,7 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
 
     QJsonArray data = parsed.value(QLatin1String("data")).toArray();
     if (data.size() == 0) {
-        SOCIALD_LOG_DEBUG("album with id" << fbAlbumId << "from Facebook account with id" << accountId << "has no photos");
+        qCDebug(lcSocialPlugin) << "album with id" << fbAlbumId << "from Facebook account with id" << accountId << "has no photos";
         checkRemovedImages(fbAlbumId);
         decrementSemaphore(accountId);
         return;
@@ -327,7 +327,7 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
         int imageWidth = 0;
         int imageHeight = 0;
         if (photoId.isEmpty()) {
-            SOCIALD_LOG_ERROR("Unable to parse photo id from data:" << photoValue.toObject().toVariantMap());
+            qCWarning(lcSocialPlugin) << "Unable to parse photo id from data:" << photoValue.toObject().toVariantMap();
             continue;
         }
 
@@ -375,21 +375,21 @@ void FacebookImageSyncAdaptor::imagesFinishedHandler()
         // check if we need to sync, and write to the database.
         if (!imageSrcUrl.isEmpty()) {
             if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
-                SOCIALD_LOG_DEBUG("have previously cached photo" << photoId << ":" << imageSrcUrl);
+                qCDebug(lcSocialPlugin) << "have previously cached photo" << photoId << ":" << imageSrcUrl;
             } else {
-                SOCIALD_LOG_DEBUG("caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight);
+                qCDebug(lcSocialPlugin) << "caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight;
                 m_db.addImage(photoId, fbAlbumId, fbUserId, createdTime, updatedTime,
                               photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl);
             }
         } else {
-            SOCIALD_LOG_ERROR("Cannot add photo to database:" << photoId << "- empty image source url!");
+            qCWarning(lcSocialPlugin) << "Cannot add photo to database:" << photoId << "- empty image source url!";
         }
     }
     // perform a continuation request if required.
     QJsonObject paging = parsed.value(QLatin1String("paging")).toObject();
     QString nextUrl = paging.value(QLatin1String("next")).toString();
     if (!nextUrl.isEmpty() && nextUrl != continuationUrl) {
-        SOCIALD_LOG_DEBUG("performing continuation request for more photos for Facebook account with id" << accountId << ":" << nextUrl);
+        qCDebug(lcSocialPlugin) << "performing continuation request for more photos for Facebook account with id" << accountId << ":" << nextUrl;
         requestData(accountId, accessToken, nextUrl, fbUserId, fbAlbumId);
     } else {
         // this was the laste page, check removed images
@@ -411,10 +411,10 @@ bool FacebookImageSyncAdaptor::haveAlreadyCachedImage(const QString &fbImageId, 
 
     QString dbImageUrl = dbImage->imageUrl();
     if (dbImageUrl != imageUrl) {
-        SOCIALD_LOG_ERROR("Image/facebook.db has outdated data!\n"
+        qCWarning(lcSocialPlugin) << "Image/facebook.db has outdated data!\n"
                           "   fbPhotoId:" << fbImageId << "\n"
                           "   cached image url:" << dbImageUrl << "\n"
-                          "   new image url:" << imageUrl);
+                          "   new image url:" << imageUrl;
         return false;
     }
 
@@ -465,7 +465,7 @@ void FacebookImageSyncAdaptor::userFinishedHandler()
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
     if (!ok || !parsed.contains(QLatin1String("id"))) {
-        SOCIALD_LOG_ERROR("unable to read user response for Facebook account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read user response for Facebook account with id" << accountId;
         return;
     }
 
@@ -545,6 +545,6 @@ bool FacebookImageSyncAdaptor::determineOptimalDimensions()
         m_optimalThumbnailWidth = (maxDimension / 2);
     }
     m_optimalImageWidth = maxDimension;
-    SOCIALD_LOG_DEBUG("Determined optimal image dimension:" << m_optimalImageWidth << ", thumbnail:" << m_optimalThumbnailWidth);
+    qCDebug(lcSocialPlugin) << "Determined optimal image dimension:" << m_optimalImageWidth << ", thumbnail:" << m_optimalThumbnailWidth;
     return true;
 }
