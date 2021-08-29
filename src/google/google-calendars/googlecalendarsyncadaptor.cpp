@@ -504,7 +504,7 @@ void extractStartAndEnd(const QJsonObject &eventData,
     }
 }
 
-void extractRecurrence(const QJsonArray &recurrence, KCalendarCore::Event::Ptr event, KCalendarCore::ICalFormat &icalFormat, const QList<QDateTime> &exceptions)
+void extractRecurrence(const QJsonArray &recurrence, KCalendarCore::Event::Ptr event, KCalendarCore::ICalFormat &icalFormat, const QList<QDateTime> &)
 {
     KCalendarCore::Recurrence *kcalRecurrence = event->recurrence();
     kcalRecurrence->clear(); // avoid adding duplicate recurrence information
