@@ -20,6 +20,7 @@
  ****************************************************************************/
 
 #include "vknetworkaccessmanager_p.h"
+#include "buteosyncfw_p.h"
 #include "trace.h"
 
 #include <QDateTime>
@@ -98,6 +99,6 @@ QNetworkReply *VKNetworkAccessManager::createRequest(
         return SocialdNetworkAccessManager::createRequest(op, req, outgoingData);
     }
 
-    SOCIALD_LOG_DEBUG("Throttling request! lastRequestTime:" << lastRequestTime << ", currTime:" << currTime << ", so delta:" << delta);
+    qCDebug(lcSocialPlugin) << "Throttling request! lastRequestTime:" << lastRequestTime << ", currTime:" << currTime << ", so delta:" << delta;
     return 0; // tell the client to resubmit their request, it was throttled.
 }

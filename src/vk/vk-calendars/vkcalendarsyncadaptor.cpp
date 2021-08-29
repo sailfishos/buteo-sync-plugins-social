@@ -32,7 +32,7 @@ namespace {
     }
     void jsonToKCal(const QString &vkId, const QJsonObject &json, KCalendarCore::Event::Ptr event, bool isUpdate)
     {
-        SOCIALD_LOG_DEBUG("Converting group event JSON to calendar event:" << json);
+        qCDebug(lcSocialPlugin) << "Converting group event JSON to calendar event:" << json;
         if (!isUpdate) {
             QString eventUid = QUuid::createUuid().toString().mid(1);
             eventUid.chop(1);
@@ -83,9 +83,9 @@ void VKCalendarSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 void VKCalendarSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("sync aborted, skipping finalize of VK calendar events from account:" << accountId);
+        qCDebug(lcSocialPlugin) << "sync aborted, skipping finalize of VK calendar events from account:" << accountId;
     } else {
-        SOCIALD_LOG_DEBUG("finalizing VK calendar sync with account:" << accountId);
+        qCDebug(lcSocialPlugin) << "finalizing VK calendar sync with account:" << accountId;
         // convert the m_eventObjects to mkcal events, store in db or remove as required.
         bool foundVkNotebook = false;
         Q_FOREACH (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
@@ -128,7 +128,7 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
                 m_storageNeedsSave = true;
                 m_calendar->deleteIncidence(event);
                 removedCount += 1;
-                SOCIALD_LOG_TRACE("deleted existing event:" << event->summary() << ":" << event->dtStart().toString());
+                qCDebug(lcSocialPluginTrace) << "deleted existing event:" << event->summary() << ":" << event->dtStart().toString();
             } else {
                 // this event was possibly modified server-side.
                 const QJsonObject &eventObject(m_eventObjects[accountId][vkId]);
@@ -141,9 +141,9 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
                     event->endUpdates();
                     m_storageNeedsSave = true;
                     modifiedCount += 1;
-                    SOCIALD_LOG_TRACE("modified existing event:" << event->summary() << ":" << event->dtStart().toString());
+                    qCDebug(lcSocialPluginTrace) << "modified existing event:" << event->summary() << ":" << event->dtStart().toString();
                 } else {
-                    SOCIALD_LOG_TRACE("no modificiation necessary for existing event:" << event->summary() << ":" << event->dtStart().toString());
+                    qCDebug(lcSocialPluginTrace) << "no modificiation necessary for existing event:" << event->summary() << ":" << event->dtStart().toString();
                 }
                 serverSideEventIds.remove(vkId);
             }
@@ -157,17 +157,17 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
             jsonToKCal(vkId, eventObject, event, false); // direct conversion
             event->setReadOnly(true);
             if (!m_calendar->addEvent(event, m_vkNotebook->uid())) {
-                SOCIALD_LOG_TRACE("failed to add new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook->uid());
+                qCDebug(lcSocialPluginTrace) << "failed to add new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook->uid();
                 continue;
             }
             m_storageNeedsSave = true;
             addedCount += 1;
-            SOCIALD_LOG_TRACE("added new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook->uid());
+            qCDebug(lcSocialPluginTrace) << "added new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook->uid();
         }
 
         // finished!
-        SOCIALD_LOG_INFO("finished calendars sync with VK account" << accountId <<
-                         ": got A/M/R:" << addedCount << "/" << modifiedCount << "/" << removedCount);
+        qCInfo(lcSocialPlugin) << "finished calendars sync with VK account" << accountId <<
+                         ": got A/M/R:" << addedCount << "/" << modifiedCount << "/" << removedCount;
     }
 }
 
@@ -175,7 +175,7 @@ void VKCalendarSyncAdaptor::finalCleanup()
 {
     // commit changes to db
     if (m_storageNeedsSave && !syncAborted()) {
-        SOCIALD_LOG_DEBUG("saving changes in VK calendar to storage");
+        qCDebug(lcSocialPlugin) << "saving changes in VK calendar to storage";
         m_storage->save();
         if (m_vkNotebook) {
             // the notebook will have been set writable.  make the notebook read-only again.
@@ -184,7 +184,7 @@ void VKCalendarSyncAdaptor::finalCleanup()
             m_storage->save();
         }
     } else {
-        SOCIALD_LOG_DEBUG("no changes to VK calendar - not saving storage");
+        qCDebug(lcSocialPlugin) << "no changes to VK calendar - not saving storage";
     }
     m_calendar->close();
     m_storage->close();
@@ -193,7 +193,7 @@ void VKCalendarSyncAdaptor::finalCleanup()
 void VKCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode)
 {
     // Delete the notebook and all events in it from the storage
-    SOCIALD_LOG_DEBUG("Purging calendar data for account:" << oldId);
+    qCDebug(lcSocialPlugin) << "Purging calendar data for account:" << oldId;
     if (mode == SocialNetworkSyncAdaptor::CleanUpPurge) {
         // need to initialise the database
         m_storage->open();
@@ -201,7 +201,7 @@ void VKCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncA
     Q_FOREACH (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
         if (notebook->pluginName() == QStringLiteral(SOCIALD_VK_NAME)
                 && notebook->account() == QString::number(oldId)) {
-            SOCIALD_LOG_DEBUG("Purging notebook:" << notebook->uid() << "associated with account:" << oldId);
+            qCDebug(lcSocialPlugin) << "Purging notebook:" << notebook->uid() << "associated with account:" << oldId;
             notebook->setIsReadOnly(false);
             m_storage->deleteNotebook(notebook);
             m_storageNeedsSave = true;
@@ -215,7 +215,7 @@ void VKCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncA
 
 void VKCalendarSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
-    SOCIALD_LOG_DEBUG("Beginning Calendar sync for VK, account:" << accountId);
+    qCDebug(lcSocialPlugin) << "Beginning Calendar sync for VK, account:" << accountId;
     m_eventObjects[accountId].clear();
     requestEvents(accountId, accessToken);
 }
@@ -224,10 +224,10 @@ void VKCalendarSyncAdaptor::retryThrottledRequest(const QString &request, const 
 {
     int accountId = args[0].toInt();
     if (retryLimitReached) {
-        SOCIALD_LOG_ERROR("hit request retry limit! unable to request data from VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "hit request retry limit! unable to request data from VK account with id" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
-        SOCIALD_LOG_DEBUG("retrying Calendars" << request << "request for VK account:" << accountId);
+        qCDebug(lcSocialPlugin) << "retrying Calendars" << request << "request for VK account:" << accountId;
         requestEvents(accountId, args[1].toString(), args[2].toInt());
     }
     decrementSemaphore(accountId); // finished waiting for the request.
@@ -291,7 +291,7 @@ void VKCalendarSyncAdaptor::finishedHandler()
         // the zeroth index contains the count of response items
         QJsonArray items = parsed.value("response").toObject().value("items").toArray();
         int count = parsed.value("response").toObject().value("count").toInt();
-        SOCIALD_LOG_DEBUG("total communities returned in request with account" << accountId << ":" << count);
+        qCDebug(lcSocialPlugin) << "total communities returned in request with account" << accountId << ":" << count;
         bool needMorePages = false;
         if (count == 0 || count < SOCIALD_VK_MAX_CALENDAR_ENTRY_RESULTS) {
             // finished retrieving events.
@@ -303,7 +303,7 @@ void VKCalendarSyncAdaptor::finishedHandler()
         for (int i = 1; i < items.size(); ++i) {
             QJsonObject currEvent = items.at(i).toObject();
             if (currEvent.isEmpty() || currEvent.value("type").toString() != QStringLiteral("event")) {
-                SOCIALD_LOG_DEBUG("ignoring community:" << currEvent.value("name").toString() << "as it is not an event");
+                qCDebug(lcSocialPlugin) << "ignoring community:" << currEvent.value("name").toString() << "as it is not an event";
                 continue;
             }
 
@@ -318,7 +318,7 @@ void VKCalendarSyncAdaptor::finishedHandler()
                 // events are retrieved without sync being aborted / connection loss.
                 QString gidstr = QString::number(gid);
                 m_eventObjects[accountId].insert(gidstr, currEvent);
-                SOCIALD_LOG_DEBUG("Have found event with id:" << gid << ":" << currEvent.value("name").toString());
+                qCDebug(lcSocialPlugin) << "Have found event with id:" << gid << ":" << currEvent.value("name").toString();
             } else {
                 qWarning() << "event has no id:" << currEvent;
             }
@@ -326,10 +326,10 @@ void VKCalendarSyncAdaptor::finishedHandler()
 
         // if we need to request more data, do so.  otherwise, parse all of the results into mkcal events.
         if (needMorePages) {
-            SOCIALD_LOG_DEBUG("need to fetch more pages of calendar results");
+            qCDebug(lcSocialPlugin) << "need to fetch more pages of calendar results";
             requestEvents(accountId, accessToken, offset + SOCIALD_VK_MAX_CALENDAR_ENTRY_RESULTS);
         } else {
-            SOCIALD_LOG_DEBUG("done fetching calendar results");
+            qCDebug(lcSocialPlugin) << "done fetching calendar results";
         }
     } else {
         QVariantList args;
@@ -342,8 +342,8 @@ void VKCalendarSyncAdaptor::finishedHandler()
         }
 
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse calendar data from request with account" << accountId <<
-                          "; got:" << QString::fromUtf8(replyData));
+        qCWarning(lcSocialPlugin) << "unable to parse calendar data from request with account" << accountId <<
+                          "; got:" << QString::fromUtf8(replyData);
     }
 
     // we're finished this request.  Decrement our busy semaphore.

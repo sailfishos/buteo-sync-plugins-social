@@ -108,7 +108,7 @@ void FacebookCalendarSyncAdaptor::sync(const QString &dataTypeString, int accoun
 void FacebookCalendarSyncAdaptor::finalCleanup()
 {
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit database changes";
         m_storage->close();
         return;
     }
@@ -153,7 +153,7 @@ void FacebookCalendarSyncAdaptor::finalCleanup()
         foreach (const KCalendarCore::Incidence::Ptr incidence, allIncidences) {
             if (!notebookIncidenceUids.contains(incidence->uid())) {
                 // orphan/ghost incidence.  must be deleted.
-                SOCIALD_LOG_DEBUG("deleting orphan event with uid:" << incidence->uid());
+                qCDebug(lcSocialPlugin) << "deleting orphan event with uid:" << incidence->uid();
                 m_calendar->deleteIncidence(incidence);
                 m_storageNeedsSave = true;
             }
@@ -193,7 +193,7 @@ void FacebookCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetwor
 
 void FacebookCalendarSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
-    SOCIALD_LOG_DEBUG("beginning Calendar sync for Facebook account" << accountId);
+    qCDebug(lcSocialPlugin) << "beginning Calendar sync for Facebook account" << accountId;
     requestEvents(accountId, accessToken);
 }
 
@@ -262,7 +262,7 @@ void FacebookCalendarSyncAdaptor::requestEvents(int accountId,
         setupReplyTimeout(accountId, reply);
     } else {
         delete multiPart;
-        SOCIALD_LOG_ERROR("unable to request events from Facebook account" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request events from Facebook account" << accountId;
     }
 }
 
@@ -278,9 +278,9 @@ void FacebookCalendarSyncAdaptor::finishedHandler()
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
 
-    SOCIALD_LOG_TRACE("request finished, got response:");
+    qCDebug(lcSocialPluginTrace) << "request finished, got response:";
     Q_FOREACH (const QString &line, QString::fromUtf8(replyData).split('\n', QString::SkipEmptyParts)) {
-        SOCIALD_LOG_TRACE(line);
+        qCDebug(lcSocialPluginTrace) << line;
     }
 
     QStringList ongoingRequests;
@@ -298,31 +298,31 @@ void FacebookCalendarSyncAdaptor::finishedHandler()
         foreach (QJsonValue value, array) {
             // Go through each entry in batch reply and process the events it contains
             if (!value.isObject()) {
-                SOCIALD_LOG_ERROR("Facebook calendar batch reply entry is not an object for account " << accountId);
+                qCWarning(lcSocialPlugin) << "Facebook calendar batch reply entry is not an object for account " << accountId;
                 continue;
             }
 
             QJsonObject entry = value.toObject();
             if (entry.value(QLatin1String("code")).toInt() != 200) {
-                SOCIALD_LOG_ERROR("Facebook calendar batch request for account "
-                                  << accountId << " failed with " << entry.value("code").toInt());
+                qCWarning(lcSocialPlugin) << "Facebook calendar batch request for account "
+                                  << accountId << " failed with " << entry.value("code").toInt();
                 continue;
             }
 
             if (!entry.contains(QLatin1String("body"))) {
-                SOCIALD_LOG_ERROR("Facebook calendar batch reply entry doesn't contain body field for account " << accountId);
+                qCWarning(lcSocialPlugin) << "Facebook calendar batch reply entry doesn't contain body field for account " << accountId;
                 continue;
             }
 
             QJsonDocument bodyDocument = QJsonDocument::fromJson(entry.value(QLatin1String("body")).toString().toUtf8());
             if (bodyDocument.isEmpty()) {
-                SOCIALD_LOG_ERROR("Facebook calendar batch reply body is empty for account " << accountId);
+                qCWarning(lcSocialPlugin) << "Facebook calendar batch reply body is empty for account " << accountId;
                 continue;
             }
 
             QJsonObject parsed = bodyDocument.object();
             if (!parsed.contains(QLatin1String("data"))) {
-                SOCIALD_LOG_ERROR("Facebook calendar batch reply entry doesn't contain data for account " << accountId);
+                qCWarning(lcSocialPlugin) << "Facebook calendar batch reply entry doesn't contain data for account " << accountId;
                 continue;
             }
 
@@ -380,14 +380,14 @@ void FacebookCalendarSyncAdaptor::finishedHandler()
             nextBatch.append(QStringLiteral("]"));
             requestEvents(accountId, accessToken, nextBatch);
         } else {
-            SOCIALD_LOG_DEBUG("finished all requests, about to perform database update");
+            qCDebug(lcSocialPlugin) << "finished all requests, about to perform database update";
             processParsedEvents(accountId);
             decrementSemaphore(accountId);
         }
     } else {
         // Error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse calendar data from request with account"
-                          << accountId << ", got:" << QString::fromLatin1(replyData.constData()));
+        qCWarning(lcSocialPlugin) << "unable to parse calendar data from request with account"
+                          << accountId << ", got:" << QString::fromLatin1(replyData.constData());
         decrementSemaphore(accountId);
     }
 }
@@ -396,7 +396,7 @@ void FacebookCalendarSyncAdaptor::finishedHandler()
 void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
 {
     // Search for the Facebook Notebook
-    SOCIALD_LOG_DEBUG("Received" << m_parsedEvents.size() << "events from server; determining delta");
+    qCDebug(lcSocialPlugin) << "Received" << m_parsedEvents.size() << "events from server; determining delta";
     mKCal::Notebook::Ptr fbNotebook;
     Q_FOREACH (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
         if (notebook->pluginName() == QLatin1String(FACEBOOK) && notebook->account() == QString::number(accountId)) {
@@ -436,7 +436,7 @@ void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
     KCalendarCore::Incidence::List dbEvents;
     m_storage->loadNotebookIncidences(fbNotebook->uid());
     if (!m_storage->allIncidences(&dbEvents, fbNotebook->uid())) {
-        SOCIALD_LOG_ERROR("unable to load Facebook events from database");
+        qCWarning(lcSocialPlugin) << "unable to load Facebook events from database";
         return;
     }
 
@@ -473,9 +473,9 @@ void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
                     event->setReadOnly(true);
                     event->endUpdates();
                     m_storageNeedsSave = true;
-                    SOCIALD_LOG_DEBUG("Facebook event" << event->uid() << "was modified on server");
+                    qCDebug(lcSocialPlugin) << "Facebook event" << event->uid() << "was modified on server";
                 } else {
-                    SOCIALD_LOG_DEBUG("Facebook event" << event->uid() << "is unchanged on server");
+                    qCDebug(lcSocialPlugin) << "Facebook event" << event->uid() << "is unchanged on server";
                 }
             }
         }
@@ -501,7 +501,7 @@ void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
             event->setReadOnly(true);
             m_calendar->addEvent(event, fbNotebook->uid());
             m_storageNeedsSave = true;
-            SOCIALD_LOG_DEBUG("Facebook event" << event->uid() << "was added on server");
+            qCDebug(lcSocialPlugin) << "Facebook event" << event->uid() << "was added on server";
         }
     }
 
@@ -511,7 +511,7 @@ void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
             // note: have to delete from calendar after loaded from calendar.
             m_calendar->deleteIncidence(m_calendar->incidence(incidence->uid()));
             m_storageNeedsSave = true;
-            SOCIALD_LOG_DEBUG("Facebook event" << incidence->uid() << "was deleted on server");
+            qCDebug(lcSocialPlugin) << "Facebook event" << incidence->uid() << "was deleted on server";
         }
     }
 }

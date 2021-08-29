@@ -81,12 +81,12 @@ void DropboxImageSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 {
     // get ready for sync
     if (!determineOptimalDimensions()) {
-        SOCIALD_LOG_ERROR("unable to determine optimal image dimensions, aborting");
+        qCWarning(lcSocialPlugin) << "unable to determine optimal image dimensions, aborting";
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
     if (!initRemovalDetectionLists(accountId)) {
-        SOCIALD_LOG_ERROR("unable to initialized cached account list for account" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to initialized cached account list for account" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -118,7 +118,7 @@ void DropboxImageSyncAdaptor::finalize(int accountId)
     Q_UNUSED(accountId)
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit database changes";
     } else {
         // Remove albums
         m_db.removeAlbums(m_cachedAlbums.keys());
@@ -156,7 +156,7 @@ void DropboxImageSyncAdaptor::queryCameraRollCursor(int accountId, const QString
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                      QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
 
-    SOCIALD_LOG_DEBUG("querying camera roll cursor:" << url.toString());
+    qCDebug(lcSocialPlugin) << "querying camera roll cursor:" << url.toString();
 
     QNetworkReply *reply = m_networkAccessManager->post(req, postData);
     if (reply) {
@@ -170,7 +170,7 @@ void DropboxImageSyncAdaptor::queryCameraRollCursor(int accountId, const QString
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request data from Dropbox account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request data from Dropbox account with id" << accountId;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
     }
 }
@@ -191,14 +191,14 @@ void DropboxImageSyncAdaptor::cameraRollCursorFinishedHandler()
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
 
     if (isError || !ok || parsed.contains("error")) {
-        SOCIALD_LOG_ERROR("unable to read Pictures cursor response for Dropbox account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read Pictures cursor response for Dropbox account with id" << accountId;
         if (reply->error() == QNetworkReply::ContentNotFoundError) {
-            SOCIALD_LOG_DEBUG("Possibly" << reply->request().url().toString()
-                              << "is not available on server because no photos have been uploaded yet");
+            qCDebug(lcSocialPlugin) << "Possibly" << reply->request().url().toString()
+                              << "is not available on server because no photos have been uploaded yet";
         }
         QString errorResponse = QString::fromUtf8(replyData);
         Q_FOREACH (const QString &line, errorResponse.split('\n')) {
-            SOCIALD_LOG_DEBUG(line);
+            qCDebug(lcSocialPlugin) << line;
         }
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         decrementSemaphore(accountId);
@@ -211,8 +211,8 @@ void DropboxImageSyncAdaptor::cameraRollCursorFinishedHandler()
     const DropboxAlbum::ConstPtr &dbAlbum = m_cachedAlbums.value(albumId);
     m_cachedAlbums.remove(albumId); // this album exists, so remove it from the removal detection delta.
     if (!dbAlbum.isNull() && dbAlbum->hash() == cursor) {
-        SOCIALD_LOG_DEBUG("album with id" << albumId << "by user" << userId <<
-                          "from Dropbox account with id" << accountId << "doesn't need sync");
+        qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << userId <<
+                          "from Dropbox account with id" << accountId << "doesn't need sync";
         decrementSemaphore(accountId);
         return;
     }
@@ -249,7 +249,7 @@ void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &acce
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                      QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
 
-    SOCIALD_LOG_DEBUG("querying camera roll:" << url.toString());
+    qCDebug(lcSocialPlugin) << "querying camera roll:" << url.toString();
 
     QNetworkReply *reply = m_networkAccessManager->post(req, postData);
     if (reply) {
@@ -265,7 +265,7 @@ void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &acce
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request data from Dropbox account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request data from Dropbox account with id" << accountId;
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
     }
 }
@@ -287,14 +287,14 @@ void DropboxImageSyncAdaptor::cameraRollFinishedHandler()
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
 
     if (isError || !ok || parsed.contains("error")) {
-        SOCIALD_LOG_ERROR("unable to read albums response for Dropbox account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read albums response for Dropbox account with id" << accountId;
         if (reply->error() == QNetworkReply::ContentNotFoundError) {
-            SOCIALD_LOG_DEBUG("Possibly" << reply->request().url().toString()
-                              << "is not available on server because no photos have been uploaded yet");
+            qCDebug(lcSocialPlugin) << "Possibly" << reply->request().url().toString()
+                              << "is not available on server because no photos have been uploaded yet";
         }
         QString errorResponse = QString::fromUtf8(replyData);
         Q_FOREACH (const QString &line, errorResponse.split('\n')) {
-            SOCIALD_LOG_DEBUG(line);
+            qCDebug(lcSocialPlugin) << line;
         }
         clearRemovalDetectionLists(); // don't perform server-side removal detection during this sync run.
         decrementSemaphore(accountId);
@@ -376,9 +376,9 @@ void DropboxImageSyncAdaptor::cameraRollFinishedHandler()
 
             // check if we need to sync, and write to the database.
             if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
-                SOCIALD_LOG_DEBUG("have previously cached photo" << photoId << ":" << imageSrcUrl);
+                qCDebug(lcSocialPlugin) << "have previously cached photo" << photoId << ":" << imageSrcUrl;
             } else {
-                SOCIALD_LOG_DEBUG("caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight);
+                qCDebug(lcSocialPlugin) << "caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight;
                 m_db.addImage(photoId, albumId, userId, createdTime, updatedTime,
                               photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl, accessToken);
             }
@@ -400,10 +400,10 @@ bool DropboxImageSyncAdaptor::haveAlreadyCachedImage(const QString &imageId, con
 
     QString dbImageUrl = dbImage->imageUrl();
     if (dbImageUrl != imageUrl) {
-        SOCIALD_LOG_ERROR("Image/dropbox.db has outdated data!\n"
+        qCWarning(lcSocialPlugin) << "Image/dropbox.db has outdated data!\n"
                           "   photoId:" << imageId << "\n"
                           "   cached image url:" << dbImageUrl << "\n"
-                          "   new image url:" << imageUrl);
+                          "   new image url:" << imageUrl;
         return false;
     }
 
@@ -426,7 +426,7 @@ void DropboxImageSyncAdaptor::possiblyAddNewUser(const QString &userId, int acco
     req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
                      QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
 
-    SOCIALD_LOG_DEBUG("querying Dropbox account info:" << url.toString());
+    qCDebug(lcSocialPlugin) << "querying Dropbox account info:" << url.toString();
 
     QNetworkReply *reply = m_networkAccessManager->post(req, QByteArray());
     if (reply) {
@@ -454,7 +454,7 @@ void DropboxImageSyncAdaptor::userFinishedHandler()
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
     if (!ok || !parsed.contains(QLatin1String("name"))) {
-        SOCIALD_LOG_ERROR("unable to read user response for Dropbox account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read user response for Dropbox account with id" << accountId;
         return;
     }
 
@@ -462,7 +462,7 @@ void DropboxImageSyncAdaptor::userFinishedHandler()
     QJsonObject name = parsed.value(QLatin1String("name")).toObject();
     QString display_name = name.value(QLatin1String("display_name")).toString();
     if (display_name.isEmpty()) {
-        SOCIALD_LOG_ERROR("unable to read user display name for Dropbox account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read user display name for Dropbox account with id" << accountId;
         return;
     }
 
@@ -538,6 +538,6 @@ bool DropboxImageSyncAdaptor::determineOptimalDimensions()
         m_optimalThumbnailWidth = (maxDimension / 2);
     }
     m_optimalImageWidth = maxDimension;
-    SOCIALD_LOG_DEBUG("Determined optimal image dimension:" << m_optimalImageWidth << ", thumbnail:" << m_optimalThumbnailWidth);
+    qCDebug(lcSocialPlugin) << "Determined optimal image dimension:" << m_optimalImageWidth << ", thumbnail:" << m_optimalThumbnailWidth;
     return true;
 }

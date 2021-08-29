@@ -74,9 +74,9 @@ void VKImageSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 void VKImageSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit database changes";
     } else if (m_syncError) {
-        SOCIALD_LOG_INFO("sync error, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync error, won't commit database changes";
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
         // Determine album delta.
@@ -178,10 +178,10 @@ void VKImageSyncAdaptor::finalize(int accountId)
             }
         }
 
-        LOG_DEBUG("Have finished Images sync for VK account:" << accountId);
-        LOG_DEBUG("   with Users  added:  " << m_receivedUsers.size());
-        LOG_DEBUG("   with Albums A/M/R/U:" << addedAlbums.size() << "/" << modifiedAlbums.size() << "/" << deletedAlbums.size() << "/" << unmodifiedAlbums.size());
-        LOG_DEBUG("   with Photos A/M/R/U:" << addedPhotos.size() << "/" << modifiedPhotos.size() << "/" << deletedPhotos.size() << "/" << unmodifiedPhotos.size());
+        qCDebug(lcSocialPlugin) << "Have finished Images sync for VK account:" << accountId;
+        qCDebug(lcSocialPlugin) << "   with Users  added:  " << m_receivedUsers.size();
+        qCDebug(lcSocialPlugin) << "   with Albums A/M/R/U:" << addedAlbums.size() << "/" << modifiedAlbums.size() << "/" << deletedAlbums.size() << "/" << unmodifiedAlbums.size();
+        qCDebug(lcSocialPlugin) << "   with Photos A/M/R/U:" << addedPhotos.size() << "/" << modifiedPhotos.size() << "/" << deletedPhotos.size() << "/" << unmodifiedPhotos.size();
 
         // write changes to database.
         Q_FOREACH (const VKUser::ConstPtr &user, m_receivedUsers) { m_db.addUser(user); }
@@ -200,10 +200,10 @@ void VKImageSyncAdaptor::retryThrottledRequest(const QString &request, const QVa
 {
     int accountId = args[0].toInt();
     if (retryLimitReached) {
-        SOCIALD_LOG_ERROR("hit request retry limit! unable to request data from VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "hit request retry limit! unable to request data from VK account with id" << accountId;
         m_syncError = true;
     } else {
-        SOCIALD_LOG_DEBUG("retrying Images" << request << "request for VK account:" << accountId);
+        qCDebug(lcSocialPlugin) << "retrying Images" << request << "request for VK account:" << accountId;
         if (request == QStringLiteral("requestData")) {
             requestData(accountId,
                         args[1].toString(),
@@ -226,7 +226,7 @@ void VKImageSyncAdaptor::requestData(int accountId,
                                      const QString &vkAlbumId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("skipping data request due to sync abort");
+        qCDebug(lcSocialPlugin) << "skipping data request due to sync abort";
         m_syncError = true;
         return;
     }
@@ -275,10 +275,10 @@ void VKImageSyncAdaptor::requestData(int accountId,
         connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
         connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
         if (vkAlbumId.isEmpty()) {
-            SOCIALD_LOG_DEBUG("Requesting albums for VK account:" << accountId << ":" << url.toString());
+            qCDebug(lcSocialPlugin) << "Requesting albums for VK account:" << accountId << ":" << url.toString();
             connect(reply, SIGNAL(finished()), this, SLOT(albumsFinishedHandler()));
         } else {
-            SOCIALD_LOG_DEBUG("Requesting photos from album:" << vkAlbumId << "for VK account:" << accountId << ":" << url.toString());
+            qCDebug(lcSocialPlugin) << "Requesting photos from album:" << vkAlbumId << "for VK account:" << accountId << ":" << url.toString();
             connect(reply, SIGNAL(finished()), this, SLOT(imagesFinishedHandler()));
         }
 
@@ -306,7 +306,7 @@ void VKImageSyncAdaptor::albumsFinishedHandler()
     disconnect(reply);
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
-    LOG_TRACE(QString::fromUtf8(replyData));
+    qCDebug(lcSocialPluginTrace) << QString::fromUtf8(replyData);
 
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
@@ -319,7 +319,7 @@ void VKImageSyncAdaptor::albumsFinishedHandler()
             return;
         }
 
-        SOCIALD_LOG_ERROR("unable to read albums response for VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read albums response for VK account with id" << accountId;
         m_syncError = true;
         decrementSemaphore(accountId);
         return;
@@ -327,7 +327,7 @@ void VKImageSyncAdaptor::albumsFinishedHandler()
 
     QJsonArray items = parsed.value(QLatin1String("response")).toObject().value(QLatin1String("items")).toArray();
     if (items.size() == 0) {
-        SOCIALD_LOG_DEBUG("VK account with id" << accountId << "has no albums");
+        qCDebug(lcSocialPlugin) << "VK account with id" << accountId << "has no albums";
         decrementSemaphore(accountId);
         return;
     }
@@ -360,12 +360,12 @@ void VKImageSyncAdaptor::albumsFinishedHandler()
             lastSyncTimestampForAlbum = qMax(dbAlbum->created(), dbAlbum->updated());
         }
         if (created > lastSyncTimestampForAlbum || updated > lastSyncTimestampForAlbum || (created == 0 && updated == 0)) {
-            SOCIALD_LOG_DEBUG("Need to request photos for album:" << id << title << "with timestamps:" <<
-                              created << "+" << updated << ">" << lastSyncTimestampForAlbum);
+            qCDebug(lcSocialPlugin) << "Need to request photos for album:" << id << title << "with timestamps:" <<
+                              created << "+" << updated << ">" << lastSyncTimestampForAlbum;
             m_requestedPhotosForOwnerAndAlbum.append(QStringLiteral("%1:%2:%3").arg(ownerId).arg(id).arg(accountId));
         } else {
-            SOCIALD_LOG_DEBUG("No need to request photos for album:" << id << title << "with timestamps:" <<
-                              created << "+" << updated << "<=" << lastSyncTimestampForAlbum);
+            qCDebug(lcSocialPlugin) << "No need to request photos for album:" << id << title << "with timestamps:" <<
+                              created << "+" << updated << "<=" << lastSyncTimestampForAlbum;
         }
 
         // request the information for user who owns this album if necessary
@@ -393,7 +393,7 @@ void VKImageSyncAdaptor::imagesFinishedHandler()
     disconnect(reply);
     reply->deleteLater();
     removeReplyTimeout(accountId, reply);
-    LOG_TRACE(QString::fromUtf8(replyData));
+    qCDebug(lcSocialPluginTrace) << QString::fromUtf8(replyData);
 
     bool ok = false;
     QJsonObject parsed = parseJsonObjectReplyData(replyData, &ok);
@@ -406,7 +406,7 @@ void VKImageSyncAdaptor::imagesFinishedHandler()
             return;
         }
 
-        SOCIALD_LOG_ERROR("unable to read photos response for VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read photos response for VK account with id" << accountId;
         m_syncError = true;
         decrementSemaphore(accountId);
         return;
@@ -414,7 +414,7 @@ void VKImageSyncAdaptor::imagesFinishedHandler()
 
     QJsonArray items = parsed.value(QLatin1String("response")).toObject().value(QLatin1String("items")).toArray();
     if (items.size() == 0) {
-        SOCIALD_LOG_DEBUG("album with id" << vkAlbumId << "from VK account with id" << accountId << "has no photos");
+        qCDebug(lcSocialPlugin) << "album with id" << vkAlbumId << "from VK account with id" << accountId << "has no photos";
         VKAlbum::Ptr emptyAlbum = VKAlbum::create(vkAlbumId, vkUserId, QString(), QString(), QString(), QString(), 0, 0, 0, accountId);
         m_emptyAlbums.append(emptyAlbum);
     }
@@ -459,7 +459,7 @@ void VKImageSyncAdaptor::imagesFinishedHandler()
         }
 
         // append the photo to our internal list.
-        SOCIALD_LOG_DEBUG("have new photo:" << id << src << height << width << date);
+        qCDebug(lcSocialPlugin) << "have new photo:" << id << src << height << width << date;
 
         m_receivedPhotos.append(VKImage::create(id, vkAlbumId, vkUserId, text, thumbSrc,
                                                 src, QString(), QString(),
@@ -477,7 +477,7 @@ void VKImageSyncAdaptor::imagesFinishedHandler()
         queryItems.removeAllQueryItems("offset");
         queryItems.addQueryItem("offset", QString::number(offset));
         continuation.setQuery(queryItems);
-        SOCIALD_LOG_DEBUG("performing continuation request for album:" << vkAlbumId << ":" << continuation.toString());
+        qCDebug(lcSocialPlugin) << "performing continuation request for album:" << vkAlbumId << ":" << continuation.toString();
         requestData(accountId, accessToken, continuation.toString(), vkUserId, vkAlbumId);
     } else {
         // Load next album if there are unhandled ones in the queue
@@ -555,7 +555,7 @@ void VKImageSyncAdaptor::userFinishedHandler()
             // it will be decremented in retryThrottledRequest().
             return;
         }
-        SOCIALD_LOG_ERROR("unable to read users.get response for VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to read users.get response for VK account with id" << accountId;
         return;
     }
 
@@ -577,7 +577,7 @@ void VKImageSyncAdaptor::requestQueuedAlbum(const QString &accessToken)
         QString ownerId = parts.at(0);
         QString id = parts.at(1);
         int accountId = parts.at(2).toInt();
-        SOCIALD_LOG_DEBUG("start loading VK album:" << id << ownerId << accountId);
+        qCDebug(lcSocialPlugin) << "start loading VK album:" << id << ownerId << accountId;
         m_currentAlbumIndex++;
         requestData(accountId, accessToken, QString(), ownerId, id);
     }

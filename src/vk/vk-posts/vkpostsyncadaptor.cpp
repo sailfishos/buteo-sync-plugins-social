@@ -56,16 +56,16 @@ void VKPostSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncAdapt
 
 void VKPostSyncAdaptor::beginSync(int accountId, const QString &accessToken)
 {
-    SOCIALD_LOG_DEBUG("beginning VK posts sync with account:" << accountId);
+    qCDebug(lcSocialPlugin) << "beginning VK posts sync with account:" << accountId;
     requestPosts(accountId, accessToken);
 }
 
 void VKPostSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_DEBUG("sync aborted, skipping finalize of VK Posts from account:" << accountId);
+        qCDebug(lcSocialPlugin) << "sync aborted, skipping finalize of VK Posts from account:" << accountId;
     } else {
-        SOCIALD_LOG_DEBUG("finalizing VK posts sync with account:" << accountId);
+        qCDebug(lcSocialPlugin) << "finalizing VK posts sync with account:" << accountId;
         determineOptimalImageSize();
         Q_FOREACH (const PostData &post, m_postsToAdd) {
             saveVKPostFromObject(post.accountId, post.post, post.userProfiles, post.groupProfiles);
@@ -89,10 +89,10 @@ void VKPostSyncAdaptor::retryThrottledRequest(const QString &request, const QVar
 {
     int accountId = args[0].toInt();
     if (retryLimitReached) {
-        SOCIALD_LOG_ERROR("hit request retry limit! unable to request data from VK account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "hit request retry limit! unable to request data from VK account with id" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
     } else {
-        SOCIALD_LOG_DEBUG("retrying Posts" << request << "request for VK account:" << accountId);
+        qCDebug(lcSocialPlugin) << "retrying Posts" << request << "request for VK account:" << accountId;
         requestPosts(accountId, args[1].toString());
     }
     decrementSemaphore(accountId); // finished waiting for the request.
@@ -161,7 +161,7 @@ void VKPostSyncAdaptor::finishedPostsHandler()
         QJsonObject responseObj = parsed.value(QStringLiteral("response")).toObject();
         QJsonArray items = responseObj.value(QStringLiteral("items")).toArray();
         if (!items.size()) {
-            SOCIALD_LOG_DEBUG("no feed posts received for account:" << accountId);
+            qCDebug(lcSocialPlugin) << "no feed posts received for account:" << accountId;
             decrementSemaphore(accountId);
             return;
         }
@@ -188,16 +188,16 @@ void VKPostSyncAdaptor::finishedPostsHandler()
                 } else  if (object.value(QStringLiteral("type")).toString() == QStringLiteral("photo")) {
                     m_photoPostsToAdd.append(PostData(accountId, object, userProfiles, groupProfiles));
                 } else if (object.value(QStringLiteral("type")).toString() == QStringLiteral("photo_tag")) {
-                    SOCIALD_LOG_DEBUG("TODO: unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.");
+                    qCDebug(lcSocialPlugin) << "TODO: unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.";
                 } else if (object.value(QStringLiteral("type")).toString() == QStringLiteral("wall_photo")) {
-                    SOCIALD_LOG_DEBUG("TODO: unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.");
+                    qCDebug(lcSocialPlugin) << "TODO: unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.";
                 } else if (object.value(QStringLiteral("type")).toString() == QStringLiteral("note")) {
-                    SOCIALD_LOG_DEBUG("TODO: unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.");
+                    qCDebug(lcSocialPlugin) << "TODO: unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.";
                 } else {
-                    SOCIALD_LOG_DEBUG("unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.");
+                    qCDebug(lcSocialPlugin) << "unhandled newsfeed item type:" << object.value(QStringLiteral("type")).toString() << ", skipping.";
                 }
             } else {
-                SOCIALD_LOG_DEBUG("post object empty; skipping");
+                qCDebug(lcSocialPlugin) << "post object empty; skipping";
             }
         }
     } else {
@@ -210,8 +210,8 @@ void VKPostSyncAdaptor::finishedPostsHandler()
             return;
         }
         // error occurred during request.
-        SOCIALD_LOG_ERROR("error: unable to parse event feed data from request with account"
-                          << accountId << "got:" << QString::fromUtf8(replyData));
+        qCWarning(lcSocialPlugin) << "error: unable to parse event feed data from request with account"
+                          << accountId << "got:" << QString::fromUtf8(replyData);
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -384,12 +384,12 @@ void VKPostSyncAdaptor::saveVKPostFromObject(int accountId, const QJsonObject &p
         newPost.link = QStringLiteral("https://m.vk.com/wall") + identifier;
     }
 
-    Q_FOREACH (const QString &line, body.split('\n')) { SOCIALD_LOG_TRACE(line); }
+    Q_FOREACH (const QString &line, body.split('\n')) { qCDebug(lcSocialPluginTrace) << line; }
 
     if (hasValidContent) {
         m_db.addVKPost(identifier, createdTime, body, newPost, images, posterName, posterIcon, accountId);
     } else {
-        SOCIALD_LOG_DEBUG("VK post without valid content, skipping");
+        qCDebug(lcSocialPlugin) << "VK post without valid content, skipping";
     }
 }
 
@@ -449,7 +449,7 @@ void VKPostSyncAdaptor::saveVKPhotoPostFromObject(int accountId, const QJsonObje
     if (hasValidContent) {
         m_db.addVKPost(identifier, createdTime, QString(), newPost, images, posterName, posterIcon, accountId);
     } else {
-        SOCIALD_LOG_DEBUG("VK photo post without valid content, skipping");
+        qCDebug(lcSocialPlugin) << "VK photo post without valid content, skipping";
     }
 }
 
@@ -476,7 +476,7 @@ void VKPostSyncAdaptor::determineOptimalImageSize()
         m_optimalImageSize = "photo_75";
     }
 
-    SOCIALD_LOG_DEBUG("Determined optimal image size for dimension " << maxDimension << " as " << m_optimalImageSize);
+    qCDebug(lcSocialPlugin) << "Determined optimal image size for dimension " << maxDimension << " as " << m_optimalImageSize;
 }
 
 // TODO: this is also in Facebook notifications adapter. Move to base class.

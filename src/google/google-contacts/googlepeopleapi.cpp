@@ -59,7 +59,7 @@ QJsonObject parseJsonObject(const QByteArray &data)
 
     QJsonDocument doc = QJsonDocument::fromJson(data, &err);
     if (err.error != QJsonParseError::NoError) {
-        SOCIALD_LOG_ERROR("JSON parse error:" << err.errorString());
+        qCWarning(lcSocialPlugin) << "JSON parse error:" << err.errorString();
         return QJsonObject();
     }
 
@@ -70,7 +70,7 @@ QFile *newResizedImageFile(const QString &imagePath, int maxWidth)
 {
     QImage image;
     if (!image.load(imagePath)) {
-        SOCIALD_LOG_ERROR("Unable to load image file:" << imagePath);
+        qCWarning(lcSocialPlugin) << "Unable to load image file:" << imagePath;
         return nullptr;
     }
 
@@ -86,7 +86,7 @@ QFile *newResizedImageFile(const QString &imagePath, int maxWidth)
         temp->seek(0);
         return temp;
     } else {
-        SOCIALD_LOG_ERROR("Unable to save resized image to file:" << temp->fileName());
+        qCWarning(lcSocialPlugin) << "Unable to save resized image to file:" << temp->fileName();
     }
 
     delete temp;
@@ -96,7 +96,7 @@ QFile *newResizedImageFile(const QString &imagePath, int maxWidth)
 bool writePhotoUpdateBody(QJsonObject *jsonObject, const QContactAvatar &avatar)
 {
     if (!avatar.imageUrl().isLocalFile()) {
-        SOCIALD_LOG_ERROR("Cannot open non-local avatar file:" << avatar.imageUrl());
+        qCWarning(lcSocialPlugin) << "Cannot open non-local avatar file:" << avatar.imageUrl();
         return false;
     }
 
@@ -106,7 +106,7 @@ bool writePhotoUpdateBody(QJsonObject *jsonObject, const QContactAvatar &avatar)
     if (!imageFile) {
         imageFile = new QFile(avatarFileName);
         if (!imageFile->open(QFile::ReadOnly)) {
-            SOCIALD_LOG_ERROR("Unable to open avatar file:" << imageFile->fileName());
+            qCWarning(lcSocialPlugin) << "Unable to open avatar file:" << imageFile->fileName();
             delete imageFile;
             return false;
         }
@@ -131,7 +131,7 @@ QString contentIdForContactOperation(GooglePeopleApi::OperationType operationTyp
 
     const QString idPrefix = contentIdPrefixes.value(operationType);
     if (idPrefix.isEmpty()) {
-        SOCIALD_LOG_ERROR("contentIdForOperationType(): invalid operation type!");
+        qCWarning(lcSocialPlugin) << "contentIdForOperationType(): invalid operation type!";
         return QString();
     }
 
@@ -172,14 +172,14 @@ QByteArray GooglePeopleApiRequest::writeMultiPartRequest(const QMap<GooglePeople
     for (auto it = batch.constBegin(); it != batch.constEnd(); ++it) {
         switch (it.key()) {
         case GooglePeopleApi::UnsupportedOperation:
-            SOCIALD_LOG_ERROR("Invalid operation type in multi-part batch");
+            qCWarning(lcSocialPlugin) << "Invalid operation type in multi-part batch";
             break;
         case GooglePeopleApi::CreateContact:
         {
             for (const QContact &contact : it.value()) {
                 const QJsonObject jsonObject = GooglePeople::Person::contactToJsonObject(contact);
                 if (jsonObject.isEmpty()) {
-                    SOCIALD_LOG_ERROR("No contact data found for contact:" << contact.id());
+                    qCWarning(lcSocialPlugin) << "No contact data found for contact:" << contact.id();
                 } else {
                     addPartHeaderForContactOperation(&bytes, it.key(), contact);
 
@@ -203,9 +203,9 @@ QByteArray GooglePeopleApiRequest::writeMultiPartRequest(const QMap<GooglePeople
                 const QJsonObject jsonObject = GooglePeople::Person::contactToJsonObject(
                             contact, &updatedPersonFieldList);
                 if (updatedPersonFieldList.isEmpty()) {
-                    SOCIALD_LOG_INFO("No non-avatar fields have changed in contact:" << contact.id());
+                    qCInfo(lcSocialPlugin) << "No non-avatar fields have changed in contact:" << contact.id();
                 } else if (jsonObject.isEmpty()) {
-                    SOCIALD_LOG_ERROR("No contact data found for contact:" << contact.id());
+                    qCWarning(lcSocialPlugin) << "No contact data found for contact:" << contact.id();
                 } else {
                     addPartHeaderForContactOperation(&bytes, it.key(), contact);
 
@@ -244,12 +244,12 @@ QByteArray GooglePeopleApiRequest::writeMultiPartRequest(const QMap<GooglePeople
             for (const QContact &contact : it.value()) {
                 const QContactAvatar avatar = GooglePeople::Photo::getPrimaryPhoto(contact);
                 if (avatar.imageUrl().isEmpty()) {
-                    SOCIALD_LOG_ERROR("No avatar found in contact:" << contact);
+                    qCWarning(lcSocialPlugin) << "No avatar found in contact:" << contact;
                     continue;
                 }
                 QJsonObject jsonObject;
                 if (!writePhotoUpdateBody(&jsonObject, avatar)) {
-                    SOCIALD_LOG_ERROR("Failed to write avatar update details:" << avatar.imageUrl());
+                    qCWarning(lcSocialPlugin) << "Failed to write avatar update details:" << avatar.imageUrl();
                     continue;
                 }
                 jsonObject.insert("personFields", supportedPersonFieldList);
@@ -316,7 +316,7 @@ void GooglePeopleApiResponse::BatchResponsePart::parse(
 {
     static const QString responseToken = QStringLiteral("response-");
     if (!responseToken.startsWith(responseToken)) {
-        SOCIALD_LOG_ERROR("Unexpected content ID in response:" << contentId);
+        qCWarning(lcSocialPlugin) << "Unexpected content ID in response:" << contentId;
         return;
     }
     const QString operationInfo = contentId.mid(responseToken.length());

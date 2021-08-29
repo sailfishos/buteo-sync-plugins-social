@@ -37,6 +37,7 @@
 #include <contactmanagerengine.h>
 
 #include "knowncontactssyncer.h"
+#include "trace.h"
 
 /*
   This performs a one-way sync to read contacts from a specified .ini file and write them to the
@@ -84,17 +85,17 @@ KnownContactsSyncer::KnownContactsSyncer(QString path, QObject *parent)
     , QtContactsSqliteExtensions::TwoWayContactSyncAdaptor(0, qAppName(), managerParameters())
     , m_syncFolder(path)
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 }
 
 KnownContactsSyncer::~KnownContactsSyncer()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 }
 
 bool KnownContactsSyncer::determineRemoteCollections()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     m_collections.clear();
 
@@ -105,7 +106,7 @@ bool KnownContactsSyncer::determineRemoteCollections()
             m_collections.append(collection);
         }
     }
-    LOG_INFO("Found" << m_collections.count() << "existing collections");
+    qCInfo(lcSocialPlugin) << "Found" << m_collections.count() << "existing collections";
 
     QDir syncDir(m_syncFolder);
     const QStringList fileNames = syncDir.entryList(QStringList() << "*-contacts-*.ini", QDir::Files);
@@ -129,7 +130,7 @@ bool KnownContactsSyncer::determineRemoteCollections()
         m_updatedCollectionFileNames[accountCollection.id()].append(fileName);
     }
 
-    LOG_INFO("Synced ini files" << fileNames << "now total collection count is:" << m_collections.count());
+    qCInfo(lcSocialPlugin) << "Synced ini files" << fileNames << "now total collection count is:" << m_collections.count();
 
     remoteCollectionsDetermined(m_collections);
     return true;
@@ -139,20 +140,20 @@ bool KnownContactsSyncer::deleteRemoteCollection(const QContactCollection &colle
 {
     Q_UNUSED(collection)
 
-    LOG_WARNING("Collection deletion not supported, ignoring request to delete collection" << collection.id());
+    qCWarning(lcSocialPlugin) << "Collection deletion not supported, ignoring request to delete collection" << collection.id();
     return true;
 }
 
 bool KnownContactsSyncer::determineRemoteContacts(const QContactCollection &collection)
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     QContactCollectionFilter collectionFilter;
     collectionFilter.setCollectionId(collection.id());
     QContactFetchHint noRelationships;
     noRelationships.setOptimizationHints(QContactFetchHint::NoRelationships);
     const QList<QContact> existingContacts = contactManager().contacts(collectionFilter, QList<QContactSortOrder>(), noRelationships);
-    LOG_DEBUG("Found" << existingContacts.size() << "existing contacts");
+    qCDebug(lcSocialPlugin) << "Found" << existingContacts.size() << "existing contacts";
 
     QHash<QString, QContact> existingContactsHash;
     for (const QContact &contact : existingContacts) {
@@ -173,14 +174,14 @@ bool KnownContactsSyncer::determineRemoteContacts(const QContactCollection &coll
         }
 
         if (!QLockFile(path + QStringLiteral(".lock")).tryLock()) {
-            LOG_DEBUG("File in use, not removing" << path);
+            qCDebug(lcSocialPlugin) << "File in use, not removing" << path;
         } else if (!QFile::remove(path)) {
-            LOG_WARNING("Could not remove" << path);
+            qCWarning(lcSocialPlugin) << "Could not remove" << path;
         }
     }
 
     const QList<QContact> updatedContacts = existingContactsHash.values();
-    LOG_DEBUG("Reporting" << updatedContacts.size() << "contacts in total");
+    qCDebug(lcSocialPlugin) << "Reporting" << updatedContacts.size() << "contacts in total";
 
     remoteContactsDetermined(collection, updatedContacts);
     return true;
@@ -196,7 +197,7 @@ bool KnownContactsSyncer::storeLocalChangesRemotely(const QContactCollection &co
     Q_UNUSED(modifiedContacts)
     Q_UNUSED(deletedContacts)
 
-    LOG_DEBUG("Sync is one-way, ignoring local changes for" << collection.id());
+    qCDebug(lcSocialPlugin) << "Sync is one-way, ignoring local changes for" << collection.id();
     return true;
 }
 
@@ -315,7 +316,7 @@ static void setCompanyInfo(QContact *contact, const QSettings &file)
 
 void KnownContactsSyncer::readContacts(QSettings *file, QHash<QString, QContact> *contacts)
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     /*
      * This was implemented to support certain subset of contact fields
@@ -343,20 +344,20 @@ void KnownContactsSyncer::readContacts(QSettings *file, QHash<QString, QContact>
 
 void KnownContactsSyncer::syncFinishedSuccessfully()
 {
-    LOG_DEBUG("Sync finished OK");
+    qCDebug(lcSocialPlugin) << "Sync finished OK";
     emit syncSucceeded();
 }
 
 void KnownContactsSyncer::syncFinishedWithError()
 {
-    LOG_WARNING("Sync finished with error");
+    qCWarning(lcSocialPlugin) << "Sync finished with error";
     emit syncFailed();
 }
 
 bool KnownContactsSyncer::purgeData(int accountId)
 {
     if (accountId <= 0) {
-        LOG_WARNING("Cannot purge data, invalid account id!");
+        qCWarning(lcSocialPlugin) << "Cannot purge data, invalid account id!";
         return false;
     }
 
@@ -375,14 +376,14 @@ bool KnownContactsSyncer::purgeData(int accountId)
                                      &deletedCollections,
                                      &unmodifiedCollections,
                                      &error)) {
-        LOG_WARNING("Cannot find collections for account" << accountId
-                    << "app" << qAppName() << "error:" << error);
+        qCWarning(lcSocialPlugin) << "Cannot find collections for account" << accountId
+                    << "app" << qAppName() << "error:" << error;
         return false;
     }
 
     const QList<QContactCollection> collections = addedCollections + modifiedCollections + deletedCollections + unmodifiedCollections;
     if (collections.isEmpty()) {
-        LOG_INFO("Nothing to purge, no collection has been saved for account" << accountId);
+        qCInfo(lcSocialPlugin) << "Nothing to purge, no collection has been saved for account" << accountId;
         return false;
     }
 
@@ -397,10 +398,10 @@ bool KnownContactsSyncer::purgeData(int accountId)
                           QtContactsSqliteExtensions::ContactManagerEngine::PreserveLocalChanges,
                           true,
                           &error)) {
-        LOG_INFO("Successfully removed contact collections" << collectionIds);
+        qCInfo(lcSocialPlugin) << "Successfully removed contact collections" << collectionIds;
         return true;
     }
 
-    LOG_WARNING("Failed to remove contact collections:" << collectionIds << "error:" << error);
+    qCWarning(lcSocialPlugin) << "Failed to remove contact collections:" << collectionIds << "error:" << error;
     return false;
 }

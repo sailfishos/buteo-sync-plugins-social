@@ -187,7 +187,7 @@ bool VKDataTypeSyncAdaptor::enqueueServerThrottledRequestIfRequired(const QJsonO
         if (errorCode == VK_THROTTLE_ERROR_CODE) {
             // we have hit the server rate limit.
             // wait a few of seconds and try again.
-            SOCIALD_LOG_DEBUG("VK server rate limit exceeded, start throttle timer");
+            qCDebug(lcSocialPlugin) << "VK server rate limit exceeded, start throttle timer";
             enqueueThrottledRequest(request, args, VK_THROTTLE_EXTRA_INTERVAL);
             return true;
         }
@@ -222,28 +222,28 @@ void VKDataTypeSyncAdaptor::throttleTimerTimeout()
 void VKDataTypeSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 {
     if (dataTypeString != SocialNetworkSyncAdaptor::dataTypeName(m_dataType)) {
-        SOCIALD_LOG_ERROR("VK" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                          "sync adaptor was asked to sync" << dataTypeString);
+        qCWarning(lcSocialPlugin) << "VK" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+                          "sync adaptor was asked to sync" << dataTypeString;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
     if (clientId().isEmpty()) {
-        SOCIALD_LOG_ERROR("clientId could not be retrieved for VK account" << accountId);
+        qCWarning(lcSocialPlugin) << "clientId could not be retrieved for VK account" << accountId;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
 
     setStatus(SocialNetworkSyncAdaptor::Busy);
     updateDataForAccount(accountId);
-    SOCIALD_LOG_DEBUG("successfully triggered sync with profile:" << m_accountSyncProfile->name());
+    qCDebug(lcSocialPlugin) << "successfully triggered sync with profile:" << m_accountSyncProfile->name();
 }
 
 void VKDataTypeSyncAdaptor::updateDataForAccount(int accountId)
 {
     Accounts::Account *account = Accounts::Account::fromId(m_accountManager, accountId, this);
     if (!account) {
-        SOCIALD_LOG_ERROR("existing account with id" << accountId << "couldn't be retrieved");
+        qCWarning(lcSocialPlugin) << "existing account with id" << accountId << "couldn't be retrieved";
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
         return;
@@ -261,10 +261,10 @@ void VKDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
     QByteArray replyData = reply->readAll();
     int accountId = reply->property("accountId").toInt();
 
-    SOCIALD_LOG_ERROR(SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
                       "request with account" << accountId <<
                       "experienced error:" << err <<
-                      "HTTP:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
+                      "HTTP:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -294,9 +294,9 @@ void VKDataTypeSyncAdaptor::sslErrorsHandler(const QList<QSslError> &errs)
     if (errs.size() > 0) {
         sslerrs.chop(2);
     }
-    SOCIALD_LOG_ERROR(SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
                       "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced ssl errors:" << sslerrs);
+                      "experienced ssl errors:" << sslerrs;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     sender()->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -326,7 +326,7 @@ void VKDataTypeSyncAdaptor::loadClientId()
 
 void VKDataTypeSyncAdaptor::setCredentialsNeedUpdate(Accounts::Account *account)
 {
-    SOCIALD_LOG_INFO("sociald:VKontakte: setting CredentialsNeedUpdate to true for account:" << account->id());
+    qCInfo(lcSocialPlugin) << "sociald:VKontakte: setting CredentialsNeedUpdate to true for account:" << account->id();
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
     account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
@@ -349,7 +349,7 @@ void VKDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     account->selectService(srv);
     SignOn::Identity *identity = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
     if (!identity) {
-        SOCIALD_LOG_ERROR("error: account has no valid credentials, cannot sign in:" << accountId);
+        qCWarning(lcSocialPlugin) << "error: account has no valid credentials, cannot sign in:" << accountId;
         decrementSemaphore(accountId);
         return;
     }
@@ -359,7 +359,7 @@ void VKDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     QString mechanism = accSrv.authData().mechanism();
     SignOn::AuthSession *session = identity->createSession(method);
     if (!session) {
-        SOCIALD_LOG_ERROR("error: could not create signon session for account:" << accountId);
+        qCWarning(lcSocialPlugin) << "error: could not create signon session for account:" << accountId;
         identity->deleteLater();
         decrementSemaphore(accountId);
         return;
@@ -387,8 +387,8 @@ void VKDataTypeSyncAdaptor::signOnError(const SignOn::Error &error)
     Accounts::Account *account = session->property("account").value<Accounts::Account*>();
     SignOn::Identity *identity = session->property("identity").value<SignOn::Identity*>();
     int accountId = account->id();
-    SOCIALD_LOG_ERROR("credentials for account with id" << accountId <<
-                      "couldn't be retrieved:" << error.type() << "," << error.message());
+    qCWarning(lcSocialPlugin) << "credentials for account with id" << accountId <<
+                      "couldn't be retrieved:" << error.type() << "," << error.message();
 
     // if the error is because credentials have expired, we
     // set the CredentialsNeedUpdate key.
@@ -422,7 +422,7 @@ void VKDataTypeSyncAdaptor::signOnResponse(const SignOn::SessionData &responseDa
     if (data.contains(QLatin1String("AccessToken"))) {
         accessToken = data.value(QLatin1String("AccessToken")).toString();
     } else {
-        SOCIALD_LOG_INFO("signon response for account with id" << accountId << "contained no oauth token");
+        qCInfo(lcSocialPlugin) << "signon response for account with id" << accountId << "contained no oauth token";
     }
 
     session->disconnect(this);

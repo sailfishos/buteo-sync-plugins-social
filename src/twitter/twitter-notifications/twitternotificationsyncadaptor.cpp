@@ -92,14 +92,14 @@ void TwitterNotificationSyncAdaptor::beginSync(int accountId, const QString &oau
     if (!m_lastSyncTimestamp.isValid()) {
         m_firstTimeSync = true;
     }
-    SOCIALD_LOG_DEBUG("last sync of Twitter notifications was at:" << m_lastSyncTimestamp.toString(Qt::ISODate));
+    qCDebug(lcSocialPlugin) << "last sync of Twitter notifications was at:" << m_lastSyncTimestamp.toString(Qt::ISODate);
     requestNotifications(accountId, oauthToken, oauthTokenSecret);
 }
 
 void TwitterNotificationSyncAdaptor::finalize(int accountId)
 {
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit notification database changes for Twitter account:" << accountId);
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit notification database changes for Twitter account:" << accountId;
     } else {
         m_db.sync();
         m_db.wait();
@@ -140,7 +140,7 @@ void TwitterNotificationSyncAdaptor::requestNotifications(int accountId, const Q
             incrementSemaphore(accountId);
             setupReplyTimeout(accountId, mreply);
         } else {
-            SOCIALD_LOG_ERROR("unable to request mention timeline notifications from Twitter account with id" << accountId);
+            qCWarning(lcSocialPlugin) << "unable to request mention timeline notifications from Twitter account with id" << accountId;
         }
 
         // request retweets
@@ -176,7 +176,7 @@ void TwitterNotificationSyncAdaptor::requestNotifications(int accountId, const Q
             incrementSemaphore(accountId);
             setupReplyTimeout(accountId, rreply);
         } else {
-            SOCIALD_LOG_ERROR("unable to request retweet notifications from Twitter account with id" << accountId);
+            qCWarning(lcSocialPlugin) << "unable to request retweet notifications from Twitter account with id" << accountId;
         }
     }
 
@@ -212,7 +212,7 @@ void TwitterNotificationSyncAdaptor::requestNotifications(int accountId, const Q
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, freply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request followers from Twitter account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request followers from Twitter account with id" << accountId;
     }
 }
 
@@ -227,7 +227,7 @@ void TwitterNotificationSyncAdaptor::finishedMentionsHandler()
     removeReplyTimeout(accountId, reply);
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, ignoring request response");
+        qCInfo(lcSocialPlugin) << "sync aborted, ignoring request response";
         decrementSemaphore(accountId);
         return;
     }
@@ -236,7 +236,7 @@ void TwitterNotificationSyncAdaptor::finishedMentionsHandler()
     QJsonArray tweets = parseJsonArrayReplyData(replyData, &ok);
     if (ok) {
         if (!tweets.size()) {
-            SOCIALD_LOG_DEBUG("no mentions received for account" << accountId);
+            qCDebug(lcSocialPlugin) << "no mentions received for account" << accountId;
             decrementSemaphore(accountId);
             return;
         }
@@ -260,12 +260,12 @@ void TwitterNotificationSyncAdaptor::finishedMentionsHandler()
                           ? m_accountSyncProfile->key(Buteo::KEY_SYNC_SINCE_DAYS_PAST, QStringLiteral("7")).toInt()
                           : 7;
             if (!createdTime.isValid()) {
-                SOCIALD_LOG_INFO("ignoring Twitter mention due to invalid createdTime parsed from:" << tweet.value(QLatin1String("created_at")).toString());
+                qCInfo(lcSocialPlugin) << "ignoring Twitter mention due to invalid createdTime parsed from:" << tweet.value(QLatin1String("created_at")).toString();
             } else if (m_lastSyncTimestamp.isValid() && createdTime < m_lastSyncTimestamp) {
-                SOCIALD_LOG_DEBUG("mention notification for account" << accountId << "is older than last sync:" << createdTime << ":" << text);
+                qCDebug(lcSocialPlugin) << "mention notification for account" << accountId << "is older than last sync:" << createdTime << ":" << text;
                 break; // all subsequent notifications will be even older.
             } else if (qAbs(createdTime.daysTo(QDateTime::currentDateTimeUtc())) > sinceSpan) {
-                SOCIALD_LOG_DEBUG("mention for account" << accountId << "is more than" << sinceSpan << "days old:" << createdTime << ":" << text);
+                qCDebug(lcSocialPlugin) << "mention for account" << accountId << "is more than" << sinceSpan << "days old:" << createdTime << ":" << text;
             } else {
                 summary = userName;
                 //: Label telling the user that someone mentioned them.  e.g: "John Smith" + "mentioned you in a Tweet"
@@ -305,13 +305,13 @@ void TwitterNotificationSyncAdaptor::finishedMentionsHandler()
             notification->publish();
             if (notification->replacesId() == 0) {
                 // failed.
-                SOCIALD_LOG_ERROR("failed to publish mention notification:" <<  body);
+                qCWarning(lcSocialPlugin) << "failed to publish mention notification:" <<  body;
             }
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse mention notification data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData()));
+        qCWarning(lcSocialPlugin) << "unable to parse mention notification data from request with account" << accountId << "," <<
+                          "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -329,7 +329,7 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
     removeReplyTimeout(accountId, reply);
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, ignoring request response");
+        qCInfo(lcSocialPlugin) << "sync aborted, ignoring request response";
         decrementSemaphore(accountId);
         return;
     }
@@ -338,7 +338,7 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
     QJsonArray tweets = parseJsonArrayReplyData(replyData, &ok);
     if (ok) {
         if (!tweets.size()) {
-            SOCIALD_LOG_DEBUG("no retweets received for account" << accountId);
+            qCDebug(lcSocialPlugin) << "no retweets received for account" << accountId;
             decrementSemaphore(accountId);
             return;
         }
@@ -360,7 +360,7 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
                           ? m_accountSyncProfile->key(Buteo::KEY_SYNC_SINCE_DAYS_PAST, QStringLiteral("7")).toInt()
                           : 7;
             if (!createdTime.isValid() || qAbs(createdTime.daysTo(QDateTime::currentDateTimeUtc())) > sinceSpan) {
-                SOCIALD_LOG_DEBUG("retweet for account" << accountId << "is for tweet more than" << sinceSpan << "days old:" << createdTime << ", ignoring.");
+                qCDebug(lcSocialPlugin) << "retweet for account" << accountId << "is for tweet more than" << sinceSpan << "days old:" << createdTime << ", ignoring.";
             } else if (retweetsCount > 0) {
                 retweetCounts.insert(retweetId, retweetsCount);
                 if (!dbRetweetCounts.contains(retweetId) || dbRetweetCounts.value(retweetId) < retweetsCount) {
@@ -403,13 +403,13 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
             notification->publish();
             if (notification->replacesId() == 0) {
                 // failed.
-                SOCIALD_LOG_ERROR("failed to publish retweet notification:" <<  newlyRetweetedTweets << delta);
+                qCWarning(lcSocialPlugin) << "failed to publish retweet notification:" <<  newlyRetweetedTweets << delta;
             }
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse retweet notification data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData()));
+        qCWarning(lcSocialPlugin) << "unable to parse retweet notification data from request with account" << accountId << "," <<
+                          "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -429,7 +429,7 @@ void TwitterNotificationSyncAdaptor::finishedFollowersHandler()
     removeReplyTimeout(accountId, reply);
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, ignoring request response");
+        qCInfo(lcSocialPlugin) << "sync aborted, ignoring request response";
         decrementSemaphore(accountId);
         return;
     }
@@ -490,7 +490,7 @@ void TwitterNotificationSyncAdaptor::finishedFollowersHandler()
                         incrementSemaphore(accountId);
                         setupReplyTimeout(accountId, sreply);
                     } else {
-                        SOCIALD_LOG_ERROR("unable to request user information from Twitter account with id" << accountId);
+                        qCWarning(lcSocialPlugin) << "unable to request user information from Twitter account with id" << accountId;
                     }
                 }
             } else {
@@ -516,7 +516,7 @@ void TwitterNotificationSyncAdaptor::finishedFollowersHandler()
                 notification->publish();
                 if (notification->replacesId() == 0) {
                     // failed.
-                    SOCIALD_LOG_ERROR("failed to publish followers notification:" <<  notification->itemCount());
+                    qCWarning(lcSocialPlugin) << "failed to publish followers notification:" <<  notification->itemCount();
                 }
             }
 
@@ -525,8 +525,8 @@ void TwitterNotificationSyncAdaptor::finishedFollowersHandler()
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse mention notification data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData()));
+        qCWarning(lcSocialPlugin) << "unable to parse mention notification data from request with account" << accountId << "," <<
+                          "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -544,7 +544,7 @@ void TwitterNotificationSyncAdaptor::finishedUserShowHandler()
     removeReplyTimeout(accountId, reply);
 
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, ignoring request response");
+        qCInfo(lcSocialPlugin) << "sync aborted, ignoring request response";
         decrementSemaphore(accountId);
         return;
     }
@@ -570,10 +570,10 @@ void TwitterNotificationSyncAdaptor::finishedUserShowHandler()
         notification->publish();
         if (notification->replacesId() == 0) {
             // failed.
-            SOCIALD_LOG_ERROR("failed to publish follower notification:" <<  name << screenName);
+            qCWarning(lcSocialPlugin) << "failed to publish follower notification:" <<  name << screenName;
         }
     } else {
-        SOCIALD_LOG_ERROR("unable to parse user information response:" << replyData);
+        qCWarning(lcSocialPlugin) << "unable to parse user information response:" << replyData;
     }
 
     // we're finished this request.  Decrement our busy semaphore.

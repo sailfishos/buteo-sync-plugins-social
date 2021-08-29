@@ -118,12 +118,12 @@ void SocialNetworkSyncAdaptor::sync(const QString &dataType, int accountId)
 {
     Q_UNUSED(dataType)
     Q_UNUSED(accountId)
-    SOCIALD_LOG_ERROR("sync() must be overridden by derived types");
+    qCWarning(lcSocialPlugin) << "sync() must be overridden by derived types";
 }
 
 void SocialNetworkSyncAdaptor::abortSync(Sync::SyncStatus status)
 {
-    SOCIALD_LOG_INFO("forcing timeout of outstanding replies due to abort:" << status);
+    qCInfo(lcSocialPlugin) << "forcing timeout of outstanding replies due to abort:" << status;
     m_syncAborted = true;
     triggerReplyTimeouts();
 }
@@ -141,9 +141,9 @@ bool SocialNetworkSyncAdaptor::checkAccount(Accounts::Account *account)
     bool globallyEnabled = account->enabled();
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     if (!srv.isValid()) {
-        SOCIALD_LOG_INFO("invalid service" << syncServiceName() <<
+        qCInfo(lcSocialPlugin) << "invalid service" << syncServiceName() <<
                          "specified, account" << account->id() <<
-                         "will be disabled for" << m_serviceName << dataTypeName(m_dataType) << "sync");
+                         "will be disabled for" << m_serviceName << dataTypeName(m_dataType) << "sync";
         return false;
     }
     account->selectService(srv);
@@ -265,8 +265,8 @@ void SocialNetworkSyncAdaptor::setInitialActive(bool enabled)
 void SocialNetworkSyncAdaptor::setFinishedInactive()
 {
     finalCleanup();
-    SOCIALD_LOG_INFO("Finished" << m_serviceName << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                     "sync at:" << QDateTime::currentDateTime().toString(Qt::ISODate));
+    qCInfo(lcSocialPlugin) << "Finished" << m_serviceName << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
+                     "sync at:" << QDateTime::currentDateTime().toString(Qt::ISODate);
     setStatus(SocialNetworkSyncAdaptor::Inactive);
 }
 
@@ -275,21 +275,21 @@ void SocialNetworkSyncAdaptor::incrementSemaphore(int accountId)
     int semaphoreValue = m_accountSyncSemaphores.value(accountId);
     semaphoreValue += 1;
     m_accountSyncSemaphores.insert(accountId, semaphoreValue);
-    SOCIALD_LOG_DEBUG("incremented busy semaphore for account" << accountId << "to:" << semaphoreValue);
+    qCDebug(lcSocialPlugin) << "incremented busy semaphore for account" << accountId << "to:" << semaphoreValue;
 }
 
 void SocialNetworkSyncAdaptor::decrementSemaphore(int accountId)
 {
     if (!m_accountSyncSemaphores.contains(accountId)) {
-        SOCIALD_LOG_ERROR("no such semaphore for account" << accountId);
+        qCWarning(lcSocialPlugin) << "no such semaphore for account" << accountId;
         return;
     }
 
     int semaphoreValue = m_accountSyncSemaphores.value(accountId);
     semaphoreValue -= 1;
-    SOCIALD_LOG_DEBUG("decremented busy semaphore for account" << accountId << "to:" << semaphoreValue);
+    qCDebug(lcSocialPlugin) << "decremented busy semaphore for account" << accountId << "to:" << semaphoreValue;
     if (semaphoreValue < 0) {
-        SOCIALD_LOG_ERROR("busy semaphore is negative for account" << accountId);
+        qCWarning(lcSocialPlugin) << "busy semaphore is negative for account" << accountId;
         return;
     }
     m_accountSyncSemaphores.insert(accountId, semaphoreValue);
@@ -333,7 +333,7 @@ void SocialNetworkSyncAdaptor::timeoutReply()
     QNetworkReply *reply = timer->property("networkReply").value<QNetworkReply*>();
     int accountId = timer->property("accountId").toInt();
 
-    SOCIALD_LOG_ERROR("network request timed out while performing sync with account" << accountId);
+    qCWarning(lcSocialPlugin) << "network request timed out while performing sync with account" << accountId;
 
     m_networkReplyTimeouts[accountId].remove(reply);
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
@@ -444,7 +444,7 @@ void SocialNetworkSyncAdaptor::purgeCachedImages(SocialImagesDatabase *database,
 
     QList<SocialImage::ConstPtr> images = database->images();
     foreach (SocialImage::ConstPtr image, images) {
-        SOCIALD_LOG_DEBUG("Purge cached image " << image->imageFile() << " for account " << image->accountId());
+        qCDebug(lcSocialPlugin) << "Purge cached image " << image->imageFile() << " for account " << image->accountId();
         QFile::remove(image->imageFile());
     }
 
@@ -461,7 +461,7 @@ void SocialNetworkSyncAdaptor::purgeExpiredImages(SocialImagesDatabase *database
 
     QList<SocialImage::ConstPtr> images = database->images();
     foreach (SocialImage::ConstPtr image, images) {
-        SOCIALD_LOG_DEBUG("Purge expired image " << image->imageFile() << " for account " << image->accountId());
+        qCDebug(lcSocialPlugin) << "Purge expired image " << image->imageFile() << " for account " << image->accountId();
         QFile::remove(image->imageFile());
     }
 

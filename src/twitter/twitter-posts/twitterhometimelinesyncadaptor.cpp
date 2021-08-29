@@ -62,7 +62,7 @@ void TwitterHomeTimelineSyncAdaptor::finalize(int accountId)
 {
     Q_UNUSED(accountId)
     if (syncAborted()) {
-        SOCIALD_LOG_INFO("sync aborted, won't commit database changes");
+        qCInfo(lcSocialPlugin) << "sync aborted, won't commit database changes";
     } else {
         m_db.commit();
         m_db.wait();
@@ -102,7 +102,7 @@ void TwitterHomeTimelineSyncAdaptor::requestMe(int accountId, const QString &oau
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request user verification from Twitter account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request user verification from Twitter account with id" << accountId;
     }
 }
 
@@ -143,7 +143,7 @@ void TwitterHomeTimelineSyncAdaptor::requestPosts(int accountId, const QString &
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply);
     } else {
-        SOCIALD_LOG_ERROR("unable to request user timeline posts from Twitter account with id" << accountId);
+        qCWarning(lcSocialPlugin) << "unable to request user timeline posts from Twitter account with id" << accountId;
     }
 }
 
@@ -172,8 +172,8 @@ void TwitterHomeTimelineSyncAdaptor::finishedMeHandler()
 
         requestPosts(accountId, oauthToken, oauthTokenSecret, QString(), QString());
     } else {
-        SOCIALD_LOG_ERROR("unable to parse self user id from me request for account" << accountId << "," <<
-                          "got:" << replyData);
+        qCWarning(lcSocialPlugin) << "unable to parse self user id from me request for account" << accountId << "," <<
+                          "got:" << replyData;
     }
 
     decrementSemaphore(accountId);
@@ -195,7 +195,7 @@ void TwitterHomeTimelineSyncAdaptor::finishedPostsHandler()
     QJsonArray tweets = parseJsonArrayReplyData(replyData, &ok);
     if (ok) {
         if (!tweets.size()) {
-            SOCIALD_LOG_DEBUG("no feed posts received for account" << accountId);
+            qCDebug(lcSocialPlugin) << "no feed posts received for account" << accountId;
             decrementSemaphore(accountId);
             return;
         }
@@ -262,9 +262,9 @@ void TwitterHomeTimelineSyncAdaptor::finishedPostsHandler()
                           ? m_accountSyncProfile->key(Buteo::KEY_SYNC_SINCE_DAYS_PAST, QStringLiteral("7")).toInt()
                           : 7;
             if (eventTimestamp.daysTo(QDateTime::currentDateTime()) > sinceSpan) {
-                SOCIALD_LOG_DEBUG("tweet for account" << accountId <<
+                qCDebug(lcSocialPlugin) << "tweet for account" << accountId <<
                                   "is more than" << sinceSpan << "days old:" <<
-                                  eventTimestamp.toString(Qt::ISODate) << body);
+                                  eventTimestamp.toString(Qt::ISODate) << body;
             } else {
                 m_db.addTwitterPost(postId, name, body, eventTimestamp, icon, imageList,
                                     screenName, retweeter, consumerKey(), consumerSecret(), accountId);
@@ -272,8 +272,8 @@ void TwitterHomeTimelineSyncAdaptor::finishedPostsHandler()
         }
     } else {
         // error occurred during request.
-        SOCIALD_LOG_ERROR("unable to parse event feed data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData()));
+        qCWarning(lcSocialPlugin) << "unable to parse event feed data from request with account" << accountId << "," <<
+                          "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.

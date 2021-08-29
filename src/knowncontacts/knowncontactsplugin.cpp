@@ -26,6 +26,7 @@
 #include <buteosyncfw5/ProfileManager.h>
 #include "knowncontactsplugin.h"
 #include "knowncontactssyncer.h"
+#include "trace.h"
 
 const auto KnownContactsSyncFolder = QStringLiteral("system/privileged/Contacts/knowncontacts");
 
@@ -37,12 +38,12 @@ KnownContactsPlugin::KnownContactsPlugin(const QString& pluginName,
     : Buteo::ClientPlugin(pluginName, profile, cbInterface)
     , m_syncer(nullptr)
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 }
 
 KnownContactsPlugin::~KnownContactsPlugin()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 }
 
 /**
@@ -51,13 +52,13 @@ KnownContactsPlugin::~KnownContactsPlugin()
   */
 bool KnownContactsPlugin::init()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     if (!m_syncer) {
         auto path = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
                                QDir::separator() + KnownContactsSyncFolder;
         m_syncer = new KnownContactsSyncer(path, this);
-        LOG_DEBUG("KnownContacts plugin initialized for path" << path);
+        qCDebug(lcSocialPlugin) << "KnownContacts plugin initialized for path" << path;
     }
 
     return true;
@@ -69,12 +70,12 @@ bool KnownContactsPlugin::init()
   */
 bool KnownContactsPlugin::uninit()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     delete m_syncer;
     m_syncer = nullptr;
 
-    LOG_DEBUG("KnownContacts plugin uninitialized");
+    qCDebug(lcSocialPlugin) << "KnownContacts plugin uninitialized";
     return true;
 }
 
@@ -84,7 +85,7 @@ bool KnownContactsPlugin::uninit()
   */
 bool KnownContactsPlugin::startSync()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     if (!m_syncer)
         return false;
@@ -95,7 +96,7 @@ bool KnownContactsPlugin::startSync()
     connect(m_syncer, &KnownContactsSyncer::syncFailed,
             this, &KnownContactsPlugin::syncFailed);
 
-    LOG_DEBUG("Starting sync");
+    qCDebug(lcSocialPlugin) << "Starting sync";
 
     // Start the actual sync
     return m_syncer->startSync();
@@ -108,16 +109,16 @@ bool KnownContactsPlugin::startSync()
 void KnownContactsPlugin::abortSync(Sync::SyncStatus status)
 {
     Q_UNUSED(status)
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
-    LOG_DEBUG("Aborting is not supported");
+    qCDebug(lcSocialPlugin) << "Aborting is not supported";
     // Not supported, syncing usually takes very little time
     // and there is not much to abort
 }
 
 Buteo::SyncResults KnownContactsPlugin::getSyncResults() const
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     return m_results;
 }
@@ -128,7 +129,7 @@ Buteo::SyncResults KnownContactsPlugin::getSyncResults() const
   */
 bool KnownContactsPlugin::cleanUp()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
     bool success;
 
@@ -141,9 +142,9 @@ bool KnownContactsPlugin::cleanUp()
 
 void KnownContactsPlugin::syncSucceeded()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
-    LOG_DEBUG("Sync successful");
+    qCDebug(lcSocialPlugin) << "Sync successful";
     m_results = Buteo::SyncResults(QDateTime::currentDateTimeUtc(),
                                    Buteo::SyncResults::SYNC_RESULT_SUCCESS,
                                    Buteo::SyncResults::NO_ERROR);
@@ -152,9 +153,9 @@ void KnownContactsPlugin::syncSucceeded()
 
 void KnownContactsPlugin::syncFailed()
 {
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
 
-    LOG_DEBUG("Sync failed");
+    qCDebug(lcSocialPlugin) << "Sync failed";
     m_results = Buteo::SyncResults(iProfile.lastSuccessfulSyncTime(),
                                    Buteo::SyncResults::SYNC_RESULT_FAILED,
                                    Buteo::SyncResults::INTERNAL_ERROR);
@@ -168,7 +169,7 @@ void KnownContactsPlugin::connectivityStateChanged(Sync::ConnectivityType type, 
 {
     Q_UNUSED(type)
     Q_UNUSED(state)
-    FUNCTION_CALL_TRACE;
+    FUNCTION_CALL_TRACE(lcSocialPluginTrace);
     // Stub
 }
 
