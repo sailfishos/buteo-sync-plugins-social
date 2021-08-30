@@ -504,7 +504,7 @@ void extractStartAndEnd(const QJsonObject &eventData,
     }
 }
 
-void extractRecurrence(const QJsonArray &recurrence, KCalendarCore::Event::Ptr event, KCalendarCore::ICalFormat &icalFormat, const QList<QDateTime> &)
+void extractRecurrence(const QJsonArray &recurrence, KCalendarCore::Event::Ptr event, KCalendarCore::ICalFormat &icalFormat)
 {
     KCalendarCore::Recurrence *kcalRecurrence = event->recurrence();
     kcalRecurrence->clear(); // avoid adding duplicate recurrence information
@@ -722,7 +722,7 @@ void extractAlarms(const QJsonObject &json, KCalendarCore::Event::Ptr event, int
     }
 }
 
-void jsonToKCal(const QJsonObject &json, KCalendarCore::Event::Ptr event, int defaultReminderStartOffset, KCalendarCore::ICalFormat &icalFormat, const QList<QDateTime> exceptions, bool *changed)
+void jsonToKCal(const QJsonObject &json, KCalendarCore::Event::Ptr event, int defaultReminderStartOffset, KCalendarCore::ICalFormat &icalFormat, bool *changed)
 {
     Q_ASSERT(!event.isNull());
     bool alreadyStarted = *changed; // if this is true, we don't need to call startUpdates/endUpdates() in this function.
@@ -772,7 +772,7 @@ void jsonToKCal(const QJsonObject &json, KCalendarCore::Event::Ptr event, int de
         }
     }
     // Recurrence rules use the event start time, so must be set after it
-    extractRecurrence(json.value(QLatin1String("recurrence")).toArray(), event, icalFormat, exceptions);
+    extractRecurrence(json.value(QLatin1String("recurrence")).toArray(), event, icalFormat);
     if (isAllDay) {
         UPDATE_EVENT_PROPERTY_IF_REQUIRED(event, allDay, setAllDay, true, changed)
     }
@@ -796,8 +796,8 @@ bool localModificationIsReal(const QJsonObject &local, const QJsonObject &remote
     bool changed = true;
     KCalendarCore::Event::Ptr localEvent = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
     KCalendarCore::Event::Ptr remoteEvent = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
-    jsonToKCal(local, localEvent, defaultReminderStartOffset, icalFormat, QList<QDateTime>(), &changed);
-    jsonToKCal(remote, remoteEvent, defaultReminderStartOffset, icalFormat, QList<QDateTime>(), &changed);
+    jsonToKCal(local, localEvent, defaultReminderStartOffset, icalFormat, &changed);
+    jsonToKCal(remote, remoteEvent, defaultReminderStartOffset, icalFormat, &changed);
     if (GoogleCalendarIncidenceComparator::incidencesEqual(localEvent, remoteEvent)) {
         return false; // they're equal, so the local modification is not real.
     }
@@ -2582,8 +2582,7 @@ KCalendarCore::Event::Ptr GoogleCalendarSyncAdaptor::addDummyParent(const QJsonO
 
     KCalendarCore::Event::Ptr parentEvent = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
     bool changed = true;
-    const QList<QDateTime> emptyExceptions;
-    jsonToKCal(eventData, parentEvent, 0, m_icalFormat, emptyExceptions, &changed);
+    jsonToKCal(eventData, parentEvent, 0, m_icalFormat, &changed);
     // Clear the recurrence rule, to avoid issues when one gets added during dissociation
     parentEvent->clearRecurrence();
 
@@ -2652,8 +2651,7 @@ bool GoogleCalendarSyncAdaptor::applyRemoteModify(const QString &eventId,
         return false;
     }
     bool changed = false; // modification, not insert, so initially changed = "false".
-    const QList<QDateTime> exceptions = getExceptionInstanceDates(event);
-    jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat, exceptions, &changed);
+    jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat, &changed);
     clampEventTimeToSync(event);
     qCDebug(lcSocialPlugin) << "Modified event with new lastModified time: " << event->lastModified().toString();
 
@@ -2737,8 +2735,7 @@ bool GoogleCalendarSyncAdaptor::applyRemoteInsert(const QString &eventId,
         }
     }
     bool changed = true; // set to true as it's an addition, no need to check for delta.
-    const QList<QDateTime> exceptions = getExceptionInstanceDates(event);
-    jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat, exceptions, &changed); // direct conversion
+    jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat, &changed); // direct conversion
     clampEventTimeToSync(event);
     qCDebug(lcSocialPlugin) << "Inserting event with new lastModified time: " << event->lastModified().toString();
 
@@ -2888,8 +2885,7 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(const QString 
         // all changes are modifications to existing events, since it was an upsync response.
         bool changed = false;
         qCDebug(lcSocialPlugin) << "Updating event:" << event->summary();
-        const QList<QDateTime> exceptions = getExceptionInstanceDates(event);
-        jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat, exceptions, &changed);
+        jsonToKCal(eventData, event, m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat, &changed);
         if (changed) {
             flagUpdateSuccess(event->uid());
             qCDebug(lcSocialPlugin) << "Two-way calendar sync with account" << m_accountId << ": re-updating event:" << event->summary();
