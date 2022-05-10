@@ -44,7 +44,7 @@ private:
     QMap<int, QMap<QString, QJsonObject> > m_eventObjects;
     mKCal::ExtendedCalendar::Ptr m_calendar;
     mKCal::ExtendedStorage::Ptr m_storage;
-    mKCal::Notebook::Ptr m_vkNotebook;
+    mKCal::Notebook m_vkNotebook;
     bool m_storageNeedsSave;
 };
 

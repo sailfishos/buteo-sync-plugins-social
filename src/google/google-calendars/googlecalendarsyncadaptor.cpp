@@ -1000,19 +1000,20 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
             const QDateTime yesterdayDate = QDateTime::currentDateTimeUtc().addDays(-1);
             for (const QString &calendarId : calendarsRequiringChange) {
                 // this codepath is hit if the server replied with HTTP 410 for the sync token or timeMin value.
-                if (mKCal::Notebook::Ptr notebook = notebookForCalendarId(calendarId)) {
+                mKCal::Notebook notebook = notebookForCalendarId(calendarId);
+                if (notebook.isValid()) {
                     if (m_syncTokenFailure.contains(calendarId)) {
                         // this sync cycle failed due to the sync token being invalidated server-side.
                         // trigger clean sync with wide time span on next sync.
                         qCInfo(lcSocialPlugin) << "Clearing sync time for calendar:" << calendarId;
-                        notebook->setSyncDate(QDateTime());
+                        notebook.setSyncDate(QDateTime());
                     } else if (m_timeMinFailure.contains(calendarId)) {
                         // this sync cycle failed due to the timeMin value being too far in the past.
                         // trigger clean sync with short time span on next sync.
                         qCInfo(lcSocialPlugin) << "Setting sync time to yesterday for calendar:" << calendarId;
-                        notebook->setSyncDate(yesterdayDate);
+                        notebook.setSyncDate(yesterdayDate);
                     }
-                    notebook->setCustomProperty(NOTEBOOK_SERVER_SYNC_TOKEN_PROPERTY, QString());
+                    notebook.setCustomProperty(NOTEBOOK_SERVER_SYNC_TOKEN_PROPERTY, QString());
                     m_storage->updateNotebook(notebook);
                     // Notebook operations are immediate so no need to amend m_storageNeedsSave
                 }
@@ -1029,8 +1030,8 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
                     // if that timestamp is recent (within the last week).  If it is older than that,
                     // update it to the current date minus one day, otherwise Google will return
                     // 410 GONE "UpdatedMin too old" error on subsequent requests.
-                    mKCal::Notebook::Ptr notebook = notebookForCalendarId(updatedCalendarId);
-                    if (!notebook) {
+                    mKCal::Notebook notebook = notebookForCalendarId(updatedCalendarId);
+                    if (!notebook.isValid()) {
                         // may have been deleted due to a purge operation.
                         continue;
                     }
@@ -1042,10 +1043,10 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
                     // The "modified by" test inequality is inclusive, so changes from the sync have
                     // timestamp clamped to a second before the sync time using clampEventTimeToSync().
                     qCDebug(lcSocialPlugin) << "Latest sync date set to: " << m_syncedDateTime.toString();
-                    notebook->setSyncDate(m_syncedDateTime);
+                    notebook.setSyncDate(m_syncedDateTime);
 
                     // also update the remote sync token in each notebook.
-                    notebook->setCustomProperty(NOTEBOOK_SERVER_SYNC_TOKEN_PROPERTY,
+                    notebook.setCustomProperty(NOTEBOOK_SERVER_SYNC_TOKEN_PROPERTY,
                                                 m_calendarsNextSyncTokens.value(updatedCalendarId));
                     m_storage->updateNotebook(notebook);
                     // Notebook operations are immediate so no need to amend m_storageNeedsSave
@@ -1086,11 +1087,11 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
         m_storage->load();
         KCalendarCore::Incidence::List allIncidences;
         m_storage->allIncidences(&allIncidences);
-        mKCal::Notebook::List allNotebooks = m_storage->notebooks();
+        const QList<mKCal::Notebook> allNotebooks = m_storage->notebooks();
         QSet<QString> notebookIncidenceUids;
-        foreach (mKCal::Notebook::Ptr notebook, allNotebooks) {
+        for (const mKCal::Notebook &notebook : allNotebooks) {
             KCalendarCore::Incidence::List currNbIncidences;
-            m_storage->allIncidences(&currNbIncidences, notebook->uid());
+            m_storage->allIncidences(&currNbIncidences, notebook.uid());
             foreach (KCalendarCore::Incidence::Ptr incidence, currNbIncidences) {
                 notebookIncidenceUids.insert(incidence->uid());
             }
@@ -1128,12 +1129,12 @@ void GoogleCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkS
 
     // We clean all the entries in the calendar
     // Delete the notebooks from the storage
-    foreach (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
-        if (notebook->pluginName().startsWith(QStringLiteral("google"))
-                && notebook->account() == QString::number(oldId)) {
+    const QList<mKCal::Notebook> notebooks = m_storage->notebooks();
+    for (const mKCal::Notebook &notebook : notebooks) {
+        if (notebook.pluginName().startsWith(QStringLiteral("google"))
+                && notebook.account() == QString::number(oldId)) {
             // remove the incidences and delete the notebook
-            notebook->setIsReadOnly(false);
-            m_storage->deleteNotebook(notebook);
+            m_storage->deleteNotebook(notebook.uid());
             m_storageNeedsSave = true;
         }
     }
@@ -1288,16 +1289,17 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebooks(const QString &acce
     // any calendars which exist on the device but not the server need to be purged.
     QStringList calendarsToDelete;
     QStringList deviceCalendarIds;
-    foreach (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
-        if (notebook->pluginName().startsWith(QStringLiteral("google"))
-                && notebook->account() == QString::number(m_accountId)) {
+    const QList<mKCal::Notebook> notebooks = m_storage->notebooks();
+    for (const mKCal::Notebook &notebook : notebooks) {
+        if (notebook.pluginName().startsWith(QStringLiteral("google"))
+                && notebook.account() == QString::number(m_accountId)) {
             // back compat: notebook pluginName used to be of form: google-calendarId
-            const QString currDeviceCalendarId = notebook->pluginName().startsWith(QStringLiteral("google-"))
-                                               ? notebook->pluginName().mid(7)
-                                               : notebook->customProperty(NOTEBOOK_SERVER_ID_PROPERTY);
+            const QString currDeviceCalendarId = notebook.pluginName().startsWith(QStringLiteral("google-"))
+                                               ? notebook.pluginName().mid(7)
+                                               : notebook.customProperty(NOTEBOOK_SERVER_ID_PROPERTY);
             if (calendars.contains(currDeviceCalendarId)) {
                 // the server-side calendar exists on the device.
-                const QString notebookNextSyncToken = notebook->customProperty(NOTEBOOK_SERVER_SYNC_TOKEN_PROPERTY);
+                const QString notebookNextSyncToken = notebook.customProperty(NOTEBOOK_SERVER_SYNC_TOKEN_PROPERTY);
                 if (!notebookNextSyncToken.isEmpty()) {
                     serverCalendarIdToSyncToken.insert(currDeviceCalendarId, notebookNextSyncToken);
                 }
@@ -1305,31 +1307,31 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebooks(const QString &acce
                 // check to see if we need to perform a clean sync cycle with this notebook.
                 // if the sync token is empty and the syncTime is invalid, perform a clean sync anyway
                 const bool effectiveCleanSync = (notebookNextSyncToken.isEmpty()
-                                                 && (!notebook->syncDate().isValid()
-                                                     || notebook->syncDate().toMSecsSinceEpoch() == 0));
+                                                 && (!notebook.syncDate().isValid()
+                                                     || notebook.syncDate().toMSecsSinceEpoch() == 0));
                 if (needCleanSync || effectiveCleanSync) {
                     // we are performing a clean sync cycle.
                     // we will eventually delete and then insert this notebook.
-                    qCDebug(lcSocialPlugin) << "queueing clean sync of local calendar" << notebook->name()
+                    qCDebug(lcSocialPlugin) << "queueing clean sync of local calendar" << notebook.name()
                                       << currDeviceCalendarId << "for Google account:" << m_accountId;
                     deviceCalendarIds.append(currDeviceCalendarId);
                     calendars[currDeviceCalendarId].change = GoogleCalendarSyncAdaptor::CleanSync;
                 } else {
                     // we don't need to purge it, but we may need to update its summary/color details.
                     deviceCalendarIds.append(currDeviceCalendarId);
-                    if (notebook->name() != calendars.value(currDeviceCalendarId).summary
-                            || notebook->color() != calendars.value(currDeviceCalendarId).color
-                            || notebook->description() != calendars.value(currDeviceCalendarId).description
-                            || notebook->sharedWith() != QStringList(currDeviceCalendarId)
-                            || notebook->isReadOnly()) {
+                    if (notebook.name() != calendars.value(currDeviceCalendarId).summary
+                            || notebook.color() != calendars.value(currDeviceCalendarId).color
+                            || notebook.description() != calendars.value(currDeviceCalendarId).description
+                            || notebook.sharedWith() != QStringList(currDeviceCalendarId)
+                            || notebook.isReadOnly()) {
                         // calendar information changed server-side.
-                        qCDebug(lcSocialPlugin) << "queueing modification of local calendar" << notebook->name()
+                        qCDebug(lcSocialPlugin) << "queueing modification of local calendar" << notebook.name()
                                           << currDeviceCalendarId << "for Google account:" << m_accountId;
                         calendars[currDeviceCalendarId].change = GoogleCalendarSyncAdaptor::Modify;
                     } else {
                         // the calendar information is unchanged server-side.
                         // no need to change anything locally.
-                        qCDebug(lcSocialPlugin) << "No modification required for local calendar" << notebook->name()
+                        qCDebug(lcSocialPlugin) << "No modification required for local calendar" << notebook.name()
                                           << currDeviceCalendarId << "for Google account:" << m_accountId;
                         calendars[currDeviceCalendarId].change = GoogleCalendarSyncAdaptor::NoChange;
                     }
@@ -1337,7 +1339,7 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebooks(const QString &acce
             } else {
                 // the calendar has been removed from the server.
                 // we need to purge it from the device.
-                qCDebug(lcSocialPlugin) << "queueing removal of local calendar" << notebook->name() << currDeviceCalendarId
+                qCDebug(lcSocialPlugin) << "queueing removal of local calendar" << notebook.name() << currDeviceCalendarId
                                   << "for Google account:" << m_accountId;
                 calendarsToDelete.append(currDeviceCalendarId);
             }
@@ -1372,7 +1374,7 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebooks(const QString &acce
 void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const QString &calendarId,
                                               const QString &syncToken, const QString &pageToken)
 {
-    mKCal::Notebook::Ptr notebook = notebookForCalendarId(calendarId);
+    const mKCal::Notebook notebook = notebookForCalendarId(calendarId);
 
     // get the last sync date stored into the notebook (if it exists).
     // we need to perform a "clean" sync if we don't have a valid sync date
@@ -1382,7 +1384,7 @@ void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const 
     // for a notebook, as it implements the SQL query using an inequality on both modifiedAfter
     // and createdBefore; so instead we have to build a datetime which "should" satisfy
     // the inequality for all possible local modifications detectable since the last sync.
-    QDateTime syncDate = notebook ? notebook->syncDate().addSecs(1) : QDateTime();
+    QDateTime syncDate = notebook.isValid() ? notebook.syncDate().addSecs(1) : QDateTime();
     const bool needCleanSync = isCleanSync(calendarId);
 
     if (!needCleanSync) {
@@ -1550,18 +1552,19 @@ void GoogleCalendarSyncAdaptor::eventsFinishedHandler()
     decrementSemaphore(m_accountId);
 }
 
-mKCal::Notebook::Ptr GoogleCalendarSyncAdaptor::notebookForCalendarId(const QString &calendarId) const
+mKCal::Notebook GoogleCalendarSyncAdaptor::notebookForCalendarId(const QString &calendarId) const
 {
-    foreach (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
-        if (notebook->account() == QString::number(m_accountId)
-                && (notebook->customProperty(NOTEBOOK_SERVER_ID_PROPERTY) == calendarId
+    const QList<mKCal::Notebook> notebooks = m_storage->notebooks();
+    for (const mKCal::Notebook &notebook : notebooks ) {
+        if (notebook.account() == QString::number(m_accountId)
+                && (notebook.customProperty(NOTEBOOK_SERVER_ID_PROPERTY) == calendarId
                        // for backward compatibility with old accounts / notebooks:
-                    || notebook->pluginName() == QString::fromLatin1("google-%1").arg(calendarId))) {
+                    || notebook.pluginName() == QString::fromLatin1("google-%1").arg(calendarId))) {
             return notebook;
         }
     }
 
-    return mKCal::Notebook::Ptr();
+    return mKCal::Notebook();
 }
 
 void GoogleCalendarSyncAdaptor::finishedRequestingRemoteEvents(const QString &accessToken,
@@ -1636,8 +1639,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
     // Search for the device Notebook matching this CalendarId.
     // Only upsync changes if we're doing a delta sync, and upsync is enabled.
     bool upsyncEnabled = true;
-    mKCal::Notebook::Ptr googleNotebook = notebookForCalendarId(calendarId);
-    if (googleNotebook.isNull()) {
+    const mKCal::Notebook googleNotebook = notebookForCalendarId(calendarId);
+    if (!googleNotebook.isValid()) {
         // this is a new, never before seen calendar.
         qCInfo(lcSocialPlugin) << "No local calendar exists for:" << calendarId <<
                          "for account:" << m_accountId << ".  No upsync possible.";
@@ -1691,13 +1694,13 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
     QMap<QString, QPair<QString, QDateTime> > deletedMap; // gcalId to incidenceUid,recurrenceId
     QSet<QString> cleanSyncDeletionAdditions; // gcalIds
 
-    if (!isCleanSync(calendarId) && !googleNotebook.isNull()) {
+    if (!isCleanSync(calendarId) && googleNotebook.isValid()) {
         // delta sync, not a clean sync. populate our lists of local changes.
         qCDebug(lcSocialPluginTrace) << "Loading existing data given delta sync method";
-        m_storage->loadNotebookIncidences(googleNotebook->uid());
-        m_storage->allIncidences(&allList, googleNotebook->uid());
-        m_storage->insertedIncidences(&addedList, QDateTime(since), googleNotebook->uid());
-        m_storage->modifiedIncidences(&updatedList, QDateTime(since), googleNotebook->uid());
+        m_storage->loadNotebookIncidences(googleNotebook.uid());
+        m_storage->allIncidences(&allList, googleNotebook.uid());
+        m_storage->insertedIncidences(&addedList, QDateTime(since), googleNotebook.uid());
+        m_storage->modifiedIncidences(&updatedList, QDateTime(since), googleNotebook.uid());
 
         // mkcal's implementation of deletedIncidences() is unusual.  It returns any event
         // which was deleted after the second (datetime) parameter, IF AND ONLY IF
@@ -1707,8 +1710,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
         // any events which were added to the database due to the previous sync cycle
         // will (most likely) have been added within 1 second of the sync anchor timestamp.
         // To work around this, we need to retrieve deleted incidences twice, and unite them.
-        m_storage->deletedIncidences(&deletedList, QDateTime(since), googleNotebook->uid());
-        m_storage->deletedIncidences(&extraDeletedList, QDateTime(since).addSecs(1), googleNotebook->uid());
+        m_storage->deletedIncidences(&deletedList, QDateTime(since), googleNotebook.uid());
+        m_storage->deletedIncidences(&extraDeletedList, QDateTime(since).addSecs(1), googleNotebook.uid());
         uniteIncidenceLists(extraDeletedList, &deletedList);
 
         Q_FOREACH(const KCalendarCore::Incidence::Ptr incidence, allList) {
@@ -1780,7 +1783,7 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             } // else, newly added+deleted locally, no gcalId yet.
         }
     } else {
-        if (googleNotebook.isNull()) {
+        if (!googleNotebook.isValid()) {
             qCDebug(lcSocialPluginTrace) << "No local notebook exists for remote; no existing data to load.";
         }
     }
@@ -2359,13 +2362,13 @@ void GoogleCalendarSyncAdaptor::handleInsertModifyReply(QNetworkReply *reply)
         m_collisionErrorCount = 0;
         // TODO: reduce code duplication between here and the other function.
         // Search for the device Notebook matching this CalendarId
-        mKCal::Notebook::Ptr googleNotebook = notebookForCalendarId(calendarId);
-        if (googleNotebook.isNull()) {
+        const mKCal::Notebook googleNotebook = notebookForCalendarId(calendarId);
+        if (!googleNotebook.isValid()) {
             qCWarning(lcSocialPlugin) << "calendar" << calendarId << "doesn't have a notebook for Google account with id" << m_accountId;
             m_syncSucceeded = false;
         } else {
             // cache the update to this event in the local calendar
-            m_storage->loadNotebookIncidences(googleNotebook->uid());
+            m_storage->loadNotebookIncidences(googleNotebook.uid());
             KCalendarCore::Event::Ptr event = m_calendar->event(kcalEventId, recurrenceId);
             if (!event) {
                 qCWarning(lcSocialPlugin) << "event" << kcalEventId << recurrenceId.toString() << "was deleted locally during sync of Google account with id" << m_accountId;
@@ -2434,7 +2437,7 @@ void GoogleCalendarSyncAdaptor::upsyncFinishedHandler()
 }
 
 void GoogleCalendarSyncAdaptor::setCalendarProperties(
-        mKCal::Notebook::Ptr notebook,
+        mKCal::Notebook *notebook,
         const CalendarInfo &calendarInfo,
         const QString &serverCalendarId,
         int accountId,
@@ -2488,11 +2491,11 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 // No changes required.  Note that this just applies to the notebook metadata;
                 // there may be incidences belonging to this notebook which need modification.
                 qCDebug(lcSocialPlugin) << "No metadata changes required for local notebook for server calendar:" << serverCalendarId;
-                mKCal::Notebook::Ptr notebook = notebookForCalendarId(serverCalendarId);
+                mKCal::Notebook notebook = notebookForCalendarId(serverCalendarId);
                 // We ensure anyway property values for notebooks created without.
-                if (notebook && notebook->syncProfile() != syncProfile) {
+                if (notebook.isValid() && notebook.syncProfile() != syncProfile) {
                     qCDebug(lcSocialPlugin) << "Adding missing sync profile label.";
-                    notebook->setSyncProfile(syncProfile);
+                    notebook.setSyncProfile(syncProfile);
                     m_storage->updateNotebook(notebook);
                     // Actually, we don't need to flag m_storageNeedsSave since
                     // notebook operations are immediate on storage.
@@ -2500,34 +2503,33 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
             } break;
             case GoogleCalendarSyncAdaptor::Insert: {
                 qCDebug(lcSocialPlugin) << "Adding local notebook for new server calendar:" << serverCalendarId;
-                mKCal::Notebook::Ptr notebook = mKCal::Notebook::Ptr(new mKCal::Notebook);
-                setCalendarProperties(notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
+                mKCal::Notebook notebook;
+                setCalendarProperties(&notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
                 m_storage->addNotebook(notebook);
                 m_storageNeedsSave = true;
             } break;
             case GoogleCalendarSyncAdaptor::Modify: {
                 qCDebug(lcSocialPlugin) << "Modifications required for local notebook for server calendar:" << serverCalendarId;
-                mKCal::Notebook::Ptr notebook = notebookForCalendarId(serverCalendarId);
-                if (notebook.isNull()) {
+                mKCal::Notebook notebook = notebookForCalendarId(serverCalendarId);
+                if (!notebook.isValid()) {
                     qCWarning(lcSocialPlugin) << "unable to modify non-existent calendar:" << serverCalendarId << "for account:" << m_accountId;
                     m_syncSucceeded = false; // we don't return immediately, as we want to at least attempt to
                                              // apply other database modifications if possible, in order to leave
                                              // the local database in a usable state even after failed sync.
                 } else {
-                    setCalendarProperties(notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
+                    setCalendarProperties(&notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
                     m_storage->updateNotebook(notebook);
                     m_storageNeedsSave = true;
                 }
             } break;
             case GoogleCalendarSyncAdaptor::Delete: {
                 qCDebug(lcSocialPlugin) << "Deleting local notebook for deleted server calendar:" << serverCalendarId;
-                mKCal::Notebook::Ptr notebook = notebookForCalendarId(serverCalendarId);
-                if (notebook.isNull()) {
+                mKCal::Notebook notebook = notebookForCalendarId(serverCalendarId);
+                if (!notebook.isValid()) {
                     qCWarning(lcSocialPlugin) << "unable to delete non-existent calendar:" << serverCalendarId << "for account:" << m_accountId;
                     // m_syncSucceeded = false; // don't mark as failed, since the outcome is identical.
                 } else {
-                    notebook->setIsReadOnly(false);
-                    m_storage->deleteNotebook(notebook);
+                    m_storage->deleteNotebook(notebook.uid());
                     m_storageNeedsSave = true;
                 }
             } break;
@@ -2539,22 +2541,21 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 qCDebug(lcSocialPlugin) << "Deleting and recreating local notebook for clean-sync server calendar:" << serverCalendarId;
                 QString notebookUid; // reuse the old notebook Uid after recreating it due to clean sync.
                 // delete
-                mKCal::Notebook::Ptr notebook = notebookForCalendarId(serverCalendarId);
-                if (!notebook.isNull()) {
-                    qCDebug(lcSocialPlugin) << "deleting notebook:" << notebook->uid() << "due to clean sync";
-                    notebookUid = notebook->uid();
-                    notebook->setIsReadOnly(false);
-                    m_storage->deleteNotebook(notebook);
+                mKCal::Notebook notebook = notebookForCalendarId(serverCalendarId);
+                if (notebook.isValid()) {
+                    qCDebug(lcSocialPlugin) << "deleting notebook:" << notebook.uid() << "due to clean sync";
+                    notebookUid = notebook.uid();
+                    m_storage->deleteNotebook(notebookUid);
                 } else {
                     qCDebug(lcSocialPlugin) << "could not find local notebook corresponding to server calendar:" << serverCalendarId;
                 }
                 // and then recreate.
-                qCDebug(lcSocialPlugin) << "recreating notebook:" << notebook->uid() << "due to clean sync";
-                notebook = mKCal::Notebook::Ptr(new mKCal::Notebook);
+                qCDebug(lcSocialPlugin) << "recreating notebook:" << notebook.uid() << "due to clean sync";
+                notebook = mKCal::Notebook();
                 if (!notebookUid.isEmpty()) {
-                    notebook->setUid(notebookUid);
+                    notebook.setUid(notebookUid);
                 }
-                setCalendarProperties(notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
+                setCalendarProperties(&notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
                 m_storage->addNotebook(notebook);
                 m_storageNeedsSave = true;
             } break;
@@ -2573,9 +2574,9 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
 
 KCalendarCore::Event::Ptr GoogleCalendarSyncAdaptor::addDummyParent(const QJsonObject &eventData,
                                                                     const QString &parentId,
-                                                                    const mKCal::Notebook::Ptr googleNotebook)
+                                                                    const mKCal::Notebook &googleNotebook)
 {
-    if (!googleNotebook) {
+    if (!googleNotebook.isValid()) {
         qCWarning(lcSocialPlugin) << "No google Notebook for calendar inserting:" << parentId;
         return KCalendarCore::Event::Ptr();
     }
@@ -2590,7 +2591,7 @@ KCalendarCore::Event::Ptr GoogleCalendarSyncAdaptor::addDummyParent(const QJsonO
     qCDebug(lcSocialPlugin) << "Inserting parent event with new lastModified time: " << parentEvent->lastModified().toString();
     setGCalEventId(parentEvent, parentId);
 
-    if (!m_calendar->addEvent(parentEvent, googleNotebook->uid())) {
+    if (!m_calendar->addEvent(parentEvent, googleNotebook.uid())) {
         qCWarning(lcSocialPlugin) << "Could not add parent occurrence to calendar:" << parentId;
         return KCalendarCore::Event::Ptr();
     }
@@ -2666,9 +2667,9 @@ bool GoogleCalendarSyncAdaptor::applyRemoteInsert(const QString &eventId,
 {
     QDateTime recurrenceId = parseRecurrenceId(eventData.value("originalStartTime").toObject());
     QString parentId = eventData.value(QLatin1String("recurringEventId")).toVariant().toString();
-    mKCal::Notebook::Ptr googleNotebook = notebookForCalendarId(calendarId);
+    const mKCal::Notebook googleNotebook = notebookForCalendarId(calendarId);
 
-    if (!googleNotebook) {
+    if (!googleNotebook.isValid()) {
         qCWarning(lcSocialPlugin) << "No google Notebook for calendar:" << calendarId;
         return false;
     }
@@ -2739,7 +2740,7 @@ bool GoogleCalendarSyncAdaptor::applyRemoteInsert(const QString &eventId,
     clampEventTimeToSync(event);
     qCDebug(lcSocialPlugin) << "Inserting event with new lastModified time: " << event->lastModified().toString();
 
-    if (!m_calendar->addEvent(event, googleNotebook->uid())) {
+    if (!m_calendar->addEvent(event, googleNotebook.uid())) {
         qCWarning(lcSocialPlugin) << "Could not add dissociated occurrence to calendar:" << parentId << recurrenceId.toString();
         return false;
     }
@@ -2767,19 +2768,18 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(const QString 
     }
 
     // Set notebook writeable locally.
-    mKCal::Notebook::Ptr googleNotebook = notebookForCalendarId(calendarId);
-    if (!googleNotebook) {
+    const mKCal::Notebook googleNotebook = notebookForCalendarId(calendarId);
+    if (!googleNotebook.isValid()) {
         qCWarning(lcSocialPlugin) << "no local notebook associated with calendar:" << calendarId << "from account:" << m_accountId << "to update!";
         m_syncSucceeded = false;
         return;
     }
 
     KCalendarCore::Incidence::List allLocalEventsList;
-    m_storage->loadNotebookIncidences(googleNotebook->uid());
-    m_storage->allIncidences(&allLocalEventsList, googleNotebook->uid());
+    m_storage->loadNotebookIncidences(googleNotebook.uid());
+    m_storage->allIncidences(&allLocalEventsList, googleNotebook.uid());
 
     // write changes required to complete downsync to local database
-    googleNotebook->setIsReadOnly(false);
     if (!changesFromDownsyncForCalendar.isEmpty()) {
         // build the partial-upsync-artifact mapping for this set of changes.
         QHash<QString, QString> upsyncedUidMapping;

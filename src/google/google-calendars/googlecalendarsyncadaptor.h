@@ -114,14 +114,14 @@ private:
     void applyRemoteChangesLocally();
     void updateLocalCalendarNotebookEvents(const QString &calendarId);
 
-    mKCal::Notebook::Ptr notebookForCalendarId(const QString &calendarId) const;
+    mKCal::Notebook notebookForCalendarId(const QString &calendarId) const;
     void finishedRequestingRemoteEvents(const QString &accessToken,
                                         const QString &calendarId, const QString &syncToken,
                                         const QString &nextSyncToken, const QDateTime &since);
     void clampEventTimeToSync(KCalendarCore::Event::Ptr event) const;
     bool isCleanSync(const QString &calendarId) const;
 
-    static void setCalendarProperties(mKCal::Notebook::Ptr notebook,
+    static void setCalendarProperties(mKCal::Notebook *notebook,
                                       const CalendarInfo &calendarInfo,
                                       const QString &serverCalendarId,
                                       int accountId,
@@ -138,7 +138,7 @@ private:
 
     KCalendarCore::Event::Ptr addDummyParent(const QJsonObject &eventData,
                                              const QString &parentId,
-                                             const mKCal::Notebook::Ptr googleNotebook);
+                                             const mKCal::Notebook &googleNotebook);
 
     bool applyRemoteDelete(const QString &eventId,
                            QMap<QString, KCalendarCore::Event::Ptr> &allLocalEventsMap);
