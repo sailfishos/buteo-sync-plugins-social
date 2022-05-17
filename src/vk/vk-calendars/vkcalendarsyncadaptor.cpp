@@ -88,32 +88,32 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
         qCDebug(lcSocialPlugin) << "finalizing VK calendar sync with account:" << accountId;
         // convert the m_eventObjects to mkcal events, store in db or remove as required.
         bool foundVkNotebook = false;
-        Q_FOREACH (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
-            if (notebook->pluginName() == QStringLiteral(SOCIALD_VK_NAME)
-                    && notebook->account() == QString::number(accountId)) {
+        const QList<mKCal::Notebook> notebooks = m_storage->notebooks();
+        for (const mKCal::Notebook &notebook : notebooks) {
+            if (notebook.pluginName() == QStringLiteral(SOCIALD_VK_NAME)
+                    && notebook.account() == QString::number(accountId)) {
                 foundVkNotebook = true;
                 m_vkNotebook = notebook;
             }
         }
 
         if (!foundVkNotebook) {
-            m_vkNotebook = mKCal::Notebook::Ptr(new mKCal::Notebook);
-            m_vkNotebook->setUid(QUuid::createUuid().toString());
-            m_vkNotebook->setName(QStringLiteral("VKontakte"));
-            m_vkNotebook->setColor(QStringLiteral(SOCIALD_VK_COLOR));
-            m_vkNotebook->setPluginName(QStringLiteral(SOCIALD_VK_NAME));
-            m_vkNotebook->setAccount(QString::number(accountId));
-            m_vkNotebook->setIsReadOnly(false); // temporarily
+            m_vkNotebook = mKCal::Notebook();
+            m_vkNotebook.setUid(QUuid::createUuid().toString());
+            m_vkNotebook.setName(QStringLiteral("VKontakte"));
+            m_vkNotebook.setColor(QStringLiteral(SOCIALD_VK_COLOR));
+            m_vkNotebook.setPluginName(QStringLiteral(SOCIALD_VK_NAME));
+            m_vkNotebook.setAccount(QString::number(accountId));
+            m_vkNotebook.setIsReadOnly(true); // temporarily
             m_storage->addNotebook(m_vkNotebook);
-            m_storageNeedsSave = true;
         }
 
         // We've found the notebook for this account.
         // Build up a map of existing events, then determine A/M/R delta.
         int addedCount = 0, modifiedCount = 0, removedCount = 0;
-        m_storage->loadNotebookIncidences(m_vkNotebook->uid());
+        m_storage->loadNotebookIncidences(m_vkNotebook.uid());
         KCalendarCore::Incidence::List allIncidences;
-        m_storage->allIncidences(&allIncidences, m_vkNotebook->uid());
+        m_storage->allIncidences(&allIncidences, m_vkNotebook.uid());
         QSet<QString> serverSideEventIds = m_eventObjects[accountId].keys().toSet();
         Q_FOREACH (const KCalendarCore::Incidence::Ptr incidence, allIncidences) {
             KCalendarCore::Event::Ptr event = m_calendar->event(incidence->uid());
@@ -124,7 +124,6 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
             QString vkId = (vkIdIdx > 0 && eventUid.size() > vkIdIdx) ? eventUid.mid(eventUid.indexOf(':') + 1) : QString();
             if (!m_eventObjects[accountId].contains(vkId)) {
                 // this event was removed server-side since last sync.
-                m_vkNotebook->setIsReadOnly(false); // temporarily
                 m_storageNeedsSave = true;
                 m_calendar->deleteIncidence(event);
                 removedCount += 1;
@@ -133,7 +132,6 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
                 // this event was possibly modified server-side.
                 const QJsonObject &eventObject(m_eventObjects[accountId][vkId]);
                 if (eventNeedsUpdate(event, eventObject)) {
-                    m_vkNotebook->setIsReadOnly(false); // temporarily
                     event->startUpdates();
                     event->setReadOnly(false);
                     jsonToKCal(vkId, eventObject, event, true);
@@ -151,18 +149,17 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
 
         // if we have any left over, they're additions.
         Q_FOREACH (const QString &vkId, serverSideEventIds) {
-            m_vkNotebook->setIsReadOnly(false); // temporarily
             const QJsonObject &eventObject(m_eventObjects[accountId][vkId]);
             KCalendarCore::Event::Ptr event = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
             jsonToKCal(vkId, eventObject, event, false); // direct conversion
             event->setReadOnly(true);
-            if (!m_calendar->addEvent(event, m_vkNotebook->uid())) {
-                qCDebug(lcSocialPluginTrace) << "failed to add new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook->uid();
+            if (!m_calendar->addEvent(event, m_vkNotebook.uid())) {
+                qCDebug(lcSocialPluginTrace) << "failed to add new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook.uid();
                 continue;
             }
             m_storageNeedsSave = true;
             addedCount += 1;
-            qCDebug(lcSocialPluginTrace) << "added new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook->uid();
+            qCDebug(lcSocialPluginTrace) << "added new event:" << event->summary() << ":" << event->dtStart().toString() << "to notebook:" << m_vkNotebook.uid();
         }
 
         // finished!
@@ -177,12 +174,6 @@ void VKCalendarSyncAdaptor::finalCleanup()
     if (m_storageNeedsSave && !syncAborted()) {
         qCDebug(lcSocialPlugin) << "saving changes in VK calendar to storage";
         m_storage->save();
-        if (m_vkNotebook) {
-            // the notebook will have been set writable.  make the notebook read-only again.
-            m_vkNotebook->setIsReadOnly(true);
-            m_storage->updateNotebook(m_vkNotebook);
-            m_storage->save();
-        }
     } else {
         qCDebug(lcSocialPlugin) << "no changes to VK calendar - not saving storage";
     }
@@ -198,13 +189,12 @@ void VKCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncA
         // need to initialise the database
         m_storage->open();
     }
-    Q_FOREACH (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
-        if (notebook->pluginName() == QStringLiteral(SOCIALD_VK_NAME)
-                && notebook->account() == QString::number(oldId)) {
-            qCDebug(lcSocialPlugin) << "Purging notebook:" << notebook->uid() << "associated with account:" << oldId;
-            notebook->setIsReadOnly(false);
-            m_storage->deleteNotebook(notebook);
-            m_storageNeedsSave = true;
+    const QList<mKCal::Notebook> notebooks = m_storage->notebooks();
+    for (const mKCal::Notebook &notebook : notebooks) {
+        if (notebook.pluginName() == QStringLiteral(SOCIALD_VK_NAME)
+                && notebook.account() == QString::number(oldId)) {
+            qCDebug(lcSocialPlugin) << "Purging notebook:" << notebook.uid() << "associated with account:" << oldId;
+            m_storage->deleteNotebook(notebook.uid());
         }
     }
     if (mode == SocialNetworkSyncAdaptor::CleanUpPurge) {
