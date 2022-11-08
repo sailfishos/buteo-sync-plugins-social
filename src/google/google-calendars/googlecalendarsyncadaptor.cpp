@@ -1132,9 +1132,7 @@ void GoogleCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkS
         if (notebook->pluginName().startsWith(QStringLiteral("google"))
                 && notebook->account() == QString::number(oldId)) {
             // remove the incidences and delete the notebook
-            notebook->setIsReadOnly(false);
             m_storage->deleteNotebook(notebook);
-            m_storageNeedsSave = true;
         }
     }
 
@@ -2503,7 +2501,6 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 mKCal::Notebook::Ptr notebook = mKCal::Notebook::Ptr(new mKCal::Notebook);
                 setCalendarProperties(notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
                 m_storage->addNotebook(notebook);
-                m_storageNeedsSave = true;
             } break;
             case GoogleCalendarSyncAdaptor::Modify: {
                 qCDebug(lcSocialPlugin) << "Modifications required for local notebook for server calendar:" << serverCalendarId;
@@ -2516,7 +2513,6 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 } else {
                     setCalendarProperties(notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
                     m_storage->updateNotebook(notebook);
-                    m_storageNeedsSave = true;
                 }
             } break;
             case GoogleCalendarSyncAdaptor::Delete: {
@@ -2526,9 +2522,7 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                     qCWarning(lcSocialPlugin) << "unable to delete non-existent calendar:" << serverCalendarId << "for account:" << m_accountId;
                     // m_syncSucceeded = false; // don't mark as failed, since the outcome is identical.
                 } else {
-                    notebook->setIsReadOnly(false);
                     m_storage->deleteNotebook(notebook);
-                    m_storageNeedsSave = true;
                 }
             } break;
             case GoogleCalendarSyncAdaptor::DeleteOccurrence: {
@@ -2543,7 +2537,6 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 if (!notebook.isNull()) {
                     qCDebug(lcSocialPlugin) << "deleting notebook:" << notebook->uid() << "due to clean sync";
                     notebookUid = notebook->uid();
-                    notebook->setIsReadOnly(false);
                     m_storage->deleteNotebook(notebook);
                 } else {
                     qCDebug(lcSocialPlugin) << "could not find local notebook corresponding to server calendar:" << serverCalendarId;
@@ -2556,7 +2549,6 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 }
                 setCalendarProperties(notebook, calendarInfo, serverCalendarId, m_accountId, syncProfile, ownerEmail);
                 m_storage->addNotebook(notebook);
-                m_storageNeedsSave = true;
             } break;
         }
     }
@@ -2779,7 +2771,6 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(const QString 
     m_storage->allIncidences(&allLocalEventsList, googleNotebook->uid());
 
     // write changes required to complete downsync to local database
-    googleNotebook->setIsReadOnly(false);
     if (!changesFromDownsyncForCalendar.isEmpty()) {
         // build the partial-upsync-artifact mapping for this set of changes.
         QHash<QString, QString> upsyncedUidMapping;
