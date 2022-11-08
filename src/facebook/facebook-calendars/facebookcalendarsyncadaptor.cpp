@@ -120,10 +120,10 @@ void FacebookCalendarSyncAdaptor::finalCleanup()
 
         // set the facebook notebook back to read-only
         Q_FOREACH (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
-            if (notebook->pluginName() == QLatin1String(FACEBOOK)) {
+            if (notebook->pluginName() == QLatin1String(FACEBOOK)
+                && !notebook->isReadOnly()) {
                 notebook->setIsReadOnly(true);
                 m_storage->updateNotebook(notebook);
-                m_storage->save();
                 break;
             }
         }
@@ -179,9 +179,7 @@ void FacebookCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetwor
     foreach (mKCal::Notebook::Ptr notebook, m_storage->notebooks()) {
         if (notebook->pluginName() == QLatin1String(FACEBOOK)
                 && notebook->account() == QString::number(oldId)) {
-            notebook->setIsReadOnly(false);
             m_storage->deleteNotebook(notebook);
-            m_storageNeedsSave = true;
         }
     }
 
@@ -414,7 +412,6 @@ void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
         fbNotebook->setDescription(m_accountManager->account(accountId)->displayName());
         fbNotebook->setIsReadOnly(true);
         m_storage->addNotebook(fbNotebook);
-        m_storageNeedsSave = true;
     } else {
         // update the notebook details if required
         bool changed = false;
@@ -425,12 +422,8 @@ void FacebookCalendarSyncAdaptor::processParsedEvents(int accountId)
 
         if (changed) {
             m_storage->updateNotebook(fbNotebook);
-            m_storageNeedsSave = true;
         }
     }
-
-    // Set notebook writeable locally.
-    fbNotebook->setIsReadOnly(false);
 
     // We load incidences that are associated to Facebook into memory
     KCalendarCore::Incidence::List dbEvents;

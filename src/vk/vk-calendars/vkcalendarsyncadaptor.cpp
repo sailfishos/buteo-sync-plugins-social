@@ -103,9 +103,8 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
             m_vkNotebook->setColor(QStringLiteral(SOCIALD_VK_COLOR));
             m_vkNotebook->setPluginName(QStringLiteral(SOCIALD_VK_NAME));
             m_vkNotebook->setAccount(QString::number(accountId));
-            m_vkNotebook->setIsReadOnly(false); // temporarily
+            m_vkNotebook->setIsReadOnly(true);
             m_storage->addNotebook(m_vkNotebook);
-            m_storageNeedsSave = true;
         }
 
         // We've found the notebook for this account.
@@ -124,7 +123,6 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
             QString vkId = (vkIdIdx > 0 && eventUid.size() > vkIdIdx) ? eventUid.mid(eventUid.indexOf(':') + 1) : QString();
             if (!m_eventObjects[accountId].contains(vkId)) {
                 // this event was removed server-side since last sync.
-                m_vkNotebook->setIsReadOnly(false); // temporarily
                 m_storageNeedsSave = true;
                 m_calendar->deleteIncidence(event);
                 removedCount += 1;
@@ -133,7 +131,6 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
                 // this event was possibly modified server-side.
                 const QJsonObject &eventObject(m_eventObjects[accountId][vkId]);
                 if (eventNeedsUpdate(event, eventObject)) {
-                    m_vkNotebook->setIsReadOnly(false); // temporarily
                     event->startUpdates();
                     event->setReadOnly(false);
                     jsonToKCal(vkId, eventObject, event, true);
@@ -151,7 +148,6 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
 
         // if we have any left over, they're additions.
         Q_FOREACH (const QString &vkId, serverSideEventIds) {
-            m_vkNotebook->setIsReadOnly(false); // temporarily
             const QJsonObject &eventObject(m_eventObjects[accountId][vkId]);
             KCalendarCore::Event::Ptr event = KCalendarCore::Event::Ptr(new KCalendarCore::Event);
             jsonToKCal(vkId, eventObject, event, false); // direct conversion
@@ -177,12 +173,6 @@ void VKCalendarSyncAdaptor::finalCleanup()
     if (m_storageNeedsSave && !syncAborted()) {
         qCDebug(lcSocialPlugin) << "saving changes in VK calendar to storage";
         m_storage->save();
-        if (m_vkNotebook) {
-            // the notebook will have been set writable.  make the notebook read-only again.
-            m_vkNotebook->setIsReadOnly(true);
-            m_storage->updateNotebook(m_vkNotebook);
-            m_storage->save();
-        }
     } else {
         qCDebug(lcSocialPlugin) << "no changes to VK calendar - not saving storage";
     }
@@ -202,9 +192,7 @@ void VKCalendarSyncAdaptor::purgeDataForOldAccount(int oldId, SocialNetworkSyncA
         if (notebook->pluginName() == QStringLiteral(SOCIALD_VK_NAME)
                 && notebook->account() == QString::number(oldId)) {
             qCDebug(lcSocialPlugin) << "Purging notebook:" << notebook->uid() << "associated with account:" << oldId;
-            notebook->setIsReadOnly(false);
             m_storage->deleteNotebook(notebook);
-            m_storageNeedsSave = true;
         }
     }
     if (mode == SocialNetworkSyncAdaptor::CleanUpPurge) {
