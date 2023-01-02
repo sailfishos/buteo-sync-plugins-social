@@ -587,43 +587,30 @@ void extractAttendees(const QJsonArray &attendees, KCalendarCore::Event::Ptr eve
     event->clearAttendees();
     for (int i = 0; i < attendees.size(); ++i) {
         QJsonObject attendeeObj = attendees.at(i).toObject();
-        if (!attendeeObj.value(QLatin1String("organizer")).toVariant().toBool()) {
-            KCalendarCore::Attendee attendee(
+        KCalendarCore::Attendee attendee(
                     attendeeObj.value(QLatin1String("displayName")).toVariant().toString(),
                     attendeeObj.value(QLatin1String("email")).toVariant().toString());
-            if (attendeeObj.find(QLatin1String("optional")) != attendeeObj.end()) {
-                if (attendeeObj.value(QLatin1String("optional")).toVariant().toBool()) {
-                    attendee.setRole(KCalendarCore::Attendee::OptParticipant);
-                } else {
-                    attendee.setRole(KCalendarCore::Attendee::ReqParticipant);
-                }
-            }
-            if (attendeeObj.find(QLatin1String("responseStatus")) != attendeeObj.end()) {
-                const QString &responseValue = attendeeObj.value(QLatin1String("responseStatus")).toVariant().toString();
-                if (responseValue == "needsAction") {
-                    attendee.setStatus(KCalendarCore::Attendee::NeedsAction);
-                } else if (responseValue == "accepted") {
-                    attendee.setStatus(KCalendarCore::Attendee::Accepted);
-                } else if (responseValue == "declined") {
-                    attendee.setStatus(KCalendarCore::Attendee::Declined);
-                } else {
-                    attendee.setStatus(KCalendarCore::Attendee::Tentative);
-                }
-            }
-            attendee.setRSVP(true);
-            event->addAttendee(attendee);
-        } else {
-            if (!event->organizer().isEmpty()) {
-                continue;
-            }
-            if (!attendeeObj.value(QLatin1String("displayName")).toVariant().toString().isEmpty()
-                        || !attendeeObj.value(QLatin1String("email")).toVariant().toString().isEmpty()) {
-                KCalendarCore::Person organizer(
-                        attendeeObj.value(QLatin1String("displayName")).toVariant().toString(),
-                        attendeeObj.value(QLatin1String("email")).toVariant().toString());
-                event->setOrganizer(organizer);
+        if (attendeeObj.find(QLatin1String("optional")) != attendeeObj.end()) {
+            if (attendeeObj.value(QLatin1String("optional")).toVariant().toBool()) {
+                attendee.setRole(KCalendarCore::Attendee::OptParticipant);
+            } else {
+                attendee.setRole(KCalendarCore::Attendee::ReqParticipant);
             }
         }
+        if (attendeeObj.find(QLatin1String("responseStatus")) != attendeeObj.end()) {
+            const QString &responseValue = attendeeObj.value(QLatin1String("responseStatus")).toVariant().toString();
+            if (responseValue == "needsAction") {
+                attendee.setStatus(KCalendarCore::Attendee::NeedsAction);
+            } else if (responseValue == "accepted") {
+                attendee.setStatus(KCalendarCore::Attendee::Accepted);
+            } else if (responseValue == "declined") {
+                attendee.setStatus(KCalendarCore::Attendee::Declined);
+            } else {
+                attendee.setStatus(KCalendarCore::Attendee::Tentative);
+            }
+        }
+        attendee.setRSVP(true);
+        event->addAttendee(attendee);
     }
 }
 
@@ -2916,9 +2903,8 @@ QJsonObject GoogleCalendarSyncAdaptor::kCalToJson(KCalendarCore::Event::Ptr even
     QJsonArray attendees;
     const KCalendarCore::Attendee::List attendeesList = event->attendees();
     if (!attendeesList.isEmpty()) {
-        const QString &organizerEmail = event->organizer().email();
         Q_FOREACH (auto att, attendeesList) {
-            if (att.email().isEmpty() || att.email() == organizerEmail) {
+            if (att.email().isEmpty()) {
                 continue;
             }
             QJsonObject attendee;
