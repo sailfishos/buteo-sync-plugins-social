@@ -3091,7 +3091,7 @@ void GoogleCalendarSyncAdaptor::applySyncFailureFlags()
         KCalendarCore::Event::Ptr event = m_calendar->event(uid);
         if (!event) {
             // Load it if it wasn't already
-            m_storage->loadSeries(uid);
+            m_storage->load(uid);
             event = m_calendar->event(uid);
         }
 
