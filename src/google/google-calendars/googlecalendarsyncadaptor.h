@@ -78,6 +78,7 @@ private:
         UpsyncChange() : upsyncType(NoChange) {}
         QString accessToken;
         ChangeType upsyncType;
+        QString kcalNotebookId;
         QString kcalEventId;
         QDateTime recurrenceId;
         QString calendarId;
@@ -185,7 +186,7 @@ private:
     QMultiMap<QString, QPair<KCalendarCore::Event::Ptr, QJsonObject> > m_changesFromUpsync; // calendarId to event+upsyncResponse
     QSet<QString> m_syncTokenFailure; // calendarIds suffering from 410 error due to invalid sync token
     QSet<QString> m_timeMinFailure;   // calendarIds suffering from 410 error due to invalid timeMin value
-    KCalendarCore::Incidence::List m_purgeList;
+    QMap<QString, KCalendarCore::Incidence::List> m_purgeList; // notebookIds to local deleted incidences that can be purged
     QMap<QString, KCalendarCore::Incidence::Ptr> m_deletedGcalIdToIncidence;
 
     mKCal::ExtendedCalendar::Ptr m_calendar;

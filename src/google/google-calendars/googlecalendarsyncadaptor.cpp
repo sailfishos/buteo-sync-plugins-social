@@ -1050,9 +1050,14 @@ void GoogleCalendarSyncAdaptor::finalCleanup()
     }
     m_storageNeedsSave = false;
 
-    if (!m_purgeList.isEmpty() && !m_storage->purgeDeletedIncidences(m_purgeList)) {
-        // Silently ignore failed purge action in database.
-        qCWarning(lcSocialPlugin) << "Cannot purge from database the marked as deleted incidences.";
+    if (!m_purgeList.isEmpty()) {
+        for (QMap<QString, KCalendarCore::Incidence::List>::ConstIterator it = m_purgeList.constBegin();
+             it != m_purgeList.constEnd(); it++) {
+            if (!m_storage->purgeDeletedIncidences(it.value(), it.key())) {
+                // Silently ignore failed purge action in database.
+                qCWarning(lcSocialPlugin) << "Cannot purge from database the marked as deleted incidences.";
+            }
+        }
     }
 
     // set the success status for each of our account settings.
@@ -1945,6 +1950,7 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             UpsyncChange deletion;
             deletion.accessToken = accessToken;
             deletion.upsyncType = GoogleCalendarSyncAdaptor::Delete;
+            deletion.kcalNotebookId = googleNotebook->uid();
             deletion.kcalEventId = incidenceUid;
             deletion.recurrenceId = recurrenceId;
             deletion.calendarId = calendarId;
@@ -1974,6 +1980,7 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                 UpsyncChange modification;
                 modification.accessToken = accessToken;
                 modification.upsyncType = GoogleCalendarSyncAdaptor::Modify;
+                modification.kcalNotebookId = googleNotebook->uid();
                 modification.kcalEventId = event->uid();
                 modification.recurrenceId = event->recurrenceId();
                 modification.calendarId = calendarId;
@@ -2046,6 +2053,7 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                     UpsyncChange modification;
                     modification.accessToken = accessToken;
                     modification.upsyncType = GoogleCalendarSyncAdaptor::Modify;
+                    modification.kcalNotebookId = googleNotebook->uid();
                     modification.kcalEventId = event->uid();
                     modification.recurrenceId = event->recurrenceId();
                     modification.calendarId = calendarId;
@@ -2127,6 +2135,7 @@ void GoogleCalendarSyncAdaptor::upsyncChanges(const UpsyncChange &changeToUpsync
 {
     const QString &accessToken = changeToUpsync.accessToken;
     GoogleCalendarSyncAdaptor::ChangeType upsyncType = changeToUpsync.upsyncType;
+    const QString &kcalNotebookId = changeToUpsync.kcalNotebookId;
     const QString &kcalEventId = changeToUpsync.kcalEventId;
     const QDateTime &recurrenceId = changeToUpsync.recurrenceId;
     const QString &calendarId = changeToUpsync.calendarId;
@@ -2173,6 +2182,7 @@ void GoogleCalendarSyncAdaptor::upsyncChanges(const UpsyncChange &changeToUpsync
         reply->setProperty("accountId", m_accountId);
         reply->setProperty("accessToken", accessToken);
         reply->setProperty("upsyncType", static_cast<int>(upsyncType));
+        reply->setProperty("kcalNotebookId", kcalNotebookId);
         reply->setProperty("kcalEventId", kcalEventId);
         reply->setProperty("recurrenceId", recurrenceId);
         reply->setProperty("calendarId", calendarId);
@@ -2299,6 +2309,7 @@ void GoogleCalendarSyncAdaptor::handleErrorReply(QNetworkReply *reply)
 void GoogleCalendarSyncAdaptor::handleDeleteReply(QNetworkReply *reply)
 {
     Q_ASSERT(reply->property("accountId").toInt() == m_accountId);
+    const QString kcalNotebookId = reply->property("kcalNotebookId").toString();
     QString kcalEventId = reply->property("kcalEventId").toString();
     QString eventId = reply->property("eventId").toString();
     const QByteArray &replyData = reply->readAll();
@@ -2310,7 +2321,12 @@ void GoogleCalendarSyncAdaptor::handleDeleteReply(QNetworkReply *reply)
     if (replyData.isEmpty()) {
         KCalendarCore::Incidence::Ptr incidence = m_deletedGcalIdToIncidence.value(eventId);
         qCDebug(lcSocialPluginTrace) << "Deletion confirmed, purging event: " << kcalEventId;
-        m_purgeList += incidence;
+        const QMap<QString, KCalendarCore::Incidence::List>::Iterator it = m_purgeList.find(kcalNotebookId);
+        if (it == m_purgeList.end()) {
+            m_purgeList.insert(kcalNotebookId, KCalendarCore::Incidence::List() << incidence);
+        } else {
+            it.value().append(incidence);
+        }
     } else {
         // This path should never be taken
         qCWarning(lcSocialPlugin) << "error" << httpCode << "occurred while upsyncing calendar event deletion to Google account" << m_accountId << "; got:";
