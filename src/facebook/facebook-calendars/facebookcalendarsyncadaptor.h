@@ -32,6 +32,7 @@ class FacebookParsedEvent
 public:
     FacebookParsedEvent();
     FacebookParsedEvent(const FacebookParsedEvent &e);
+    FacebookParsedEvent &operator=(const FacebookParsedEvent &) = default;
 
 public:
     QString m_id;
