@@ -879,6 +879,10 @@ QString toBase32hex(QByteArray bytes)
     return result;
 }
 
+QString percentEnc(const QString &str) {
+    return QString::fromUtf8(QUrl::toPercentEncoding(str));
+}
+
 QString generate_uuid()
 {
     // UUID documentation here:
@@ -1416,7 +1420,7 @@ void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const 
         queryItems.append(QPair<QString, QString>(QString::fromLatin1("pageToken"), pageToken));
     }
 
-    QUrl url(QString::fromLatin1("https://www.googleapis.com/calendar/v3/calendars/%1/events").arg(calendarId));
+    QUrl url(QString::fromLatin1("https://www.googleapis.com/calendar/v3/calendars/%1/events").arg(percentEnc(calendarId)));
     QUrlQuery query(url);
     query.setQueryItems(queryItems);
     url.setQuery(query);
@@ -2149,8 +2153,8 @@ void GoogleCalendarSyncAdaptor::upsyncChanges(const UpsyncChange &changeToUpsync
     const QByteArray &eventData = changeToUpsync.eventData;
 
     QUrl requestUrl = upsyncType == GoogleCalendarSyncAdaptor::Insert
-                    ? QUrl(QString::fromLatin1("https://www.googleapis.com/calendar/v3/calendars/%1/events").arg(calendarId))
-                    : QUrl(QString::fromLatin1("https://www.googleapis.com/calendar/v3/calendars/%1/events/%2").arg(calendarId).arg(eventId));
+                    ? QUrl(QString::fromLatin1("https://www.googleapis.com/calendar/v3/calendars/%1/events").arg(percentEnc(calendarId)))
+                    : QUrl(QString::fromLatin1("https://www.googleapis.com/calendar/v3/calendars/%1/events/%2").arg(percentEnc(calendarId)).arg(eventId));
 
     QNetworkRequest request(requestUrl);
     request.setRawHeader("GData-Version", "3.0");
