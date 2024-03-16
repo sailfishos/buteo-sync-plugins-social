@@ -2448,7 +2448,7 @@ void GoogleCalendarSyncAdaptor::setCalendarProperties(
         const QString &syncProfile,
         const QString &ownerEmail)
 {
-    notebook->setIsReadOnly(false);
+    notebook->setIsReadOnly(calendarInfo.access == GoogleCalendarSyncAdaptor::Reader || calendarInfo.access == GoogleCalendarSyncAdaptor::FreeBusyReader);
     notebook->setName(calendarInfo.summary);
     notebook->setDescription(calendarInfo.description);
     notebook->setPluginName(QStringLiteral("google"));
