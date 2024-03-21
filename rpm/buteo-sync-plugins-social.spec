@@ -3,7 +3,7 @@ Summary:    Sync plugins for social services
 Version:    0.4.0
 Release:    1
 License:    LGPLv2
-URL:        https://git.sailfishos.org/mer-core/buteo-sync-plugins-social
+URL:        https://github.com/sailfishos/buteo-sync-plugins-social/
 Source0:    %{name}-%{version}.tar.bz2
 BuildRequires:  pkgconfig(Qt5Core)
 BuildRequires:  pkgconfig(Qt5DBus)
