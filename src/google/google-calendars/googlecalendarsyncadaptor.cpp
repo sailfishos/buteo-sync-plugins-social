@@ -1403,6 +1403,9 @@ void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const 
     }
 
     QList<QPair<QString, QString> > queryItems;
+    // we don't care about focusTime, outOfOffice or workingLocation
+    queryItems.append(QPair<QString, QString>(QStringLiteral("eventTypes"), QStringLiteral("default")));
+
     if (!needCleanSync) { // delta update request
         queryItems.append(QPair<QString, QString>(QString::fromLatin1("syncToken"), syncToken));
     } else { // clean sync request
