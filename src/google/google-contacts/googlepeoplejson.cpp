@@ -971,7 +971,7 @@ bool GooglePeople::Photo::saveContactDetails(QContact *contact, const QList<Phot
         const QString localFilePath = GoogleContactImageDownloader::staticOutputFile(guid, photo.url);
         if (localFilePath.isEmpty()) {
             qCWarning(lcSocialPlugin) << "Cannot generate local file name for avatar url:" << photo.url
-                              << "for contact:" << guid;
+                                      << "for contact:" << guid;
             continue;
         }
 
