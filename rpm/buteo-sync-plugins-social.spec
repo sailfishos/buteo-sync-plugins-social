@@ -90,9 +90,6 @@ for user in $USERS; do
     rm -f ${USERHOME}/.cache/msyncd/sync/facebook.Signon.xml || :
 done
 
-%post facebook
-systemctl-user try-restart msyncd.service || :
-
 
 %package google
 Summary:    Provides synchronisation with Google
@@ -182,9 +179,6 @@ for user in $USERS; do
     rm -f ${USERHOME}/.cache/msyncd/sync/twitter.Posts.xml || :
 done
 
-%post twitter
-systemctl-user try-restart msyncd.service || :
-
 %package onedrive
 Summary:    Provides synchronisation with OneDrive
 Requires: %{name} = %{version}-%{release}
@@ -244,10 +238,6 @@ for user in $USERS; do
     rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.BackupQuery.xml || :
     rm -f ${USERHOME}/.cache/msyncd/sync/onedrive.BackupRestore.xml || :
 done
-
-%post onedrive
-systemctl-user try-restart msyncd.service || :
-
 
 %package vk
 Summary:    Provides synchronisation with VK
@@ -324,10 +314,6 @@ for user in $USERS; do
 done
 
 
-%post vk
-systemctl-user restart msyncd.service || :
-
-
 %package dropbox
 Summary:    Provides synchronisation with Dropbox
 Requires: %{name} = %{version}-%{release}
@@ -376,10 +362,6 @@ for user in $USERS; do
     rm -f ${USERHOME}/.cache/msyncd/sync/dropbox.BackupRestore.xml || :
 done
 
-%post dropbox
-systemctl-user try-restart msyncd.service || :
-
-
 %package knowncontacts
 Summary: Store locally created contacts
 Requires: %{name} = %{version}-%{release}
@@ -389,9 +371,6 @@ Provides: sociald-knowncontacts
 %description knowncontacts
 Buteo sync plugin that stores locally created contacts, such as email
 recipients.
-
-%post knowncontacts
-systemctl-user try-restart msyncd.service || :
 
 %files knowncontacts
 %defattr(-,root,root,-)
@@ -448,7 +427,6 @@ rm -rf %{buildroot}
 
 %post
 /sbin/ldconfig || :
-systemctl-user try-restart msyncd.service || :
 
 %postun
 /sbin/ldconfig || :
