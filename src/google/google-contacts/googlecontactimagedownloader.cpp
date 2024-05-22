@@ -35,7 +35,8 @@ GoogleContactImageDownloader::GoogleContactImageDownloader()
 
 QString GoogleContactImageDownloader::staticOutputFile(const QString &identifier, const QUrl &url)
 {
-    return makeOutputFile(SocialSyncInterface::Google, SocialSyncInterface::Contacts, identifier, url.toString());
+    return makeUrlOutputFile(SocialSyncInterface::Google, SocialSyncInterface::Contacts, identifier,
+                             url.toString(), QString());
 }
 
 QNetworkReply * GoogleContactImageDownloader::createReply(const QString &url,
@@ -50,7 +51,10 @@ QNetworkReply * GoogleContactImageDownloader::createReply(const QString &url,
     return d->networkAccessManager->get(request);
 }
 
-QString GoogleContactImageDownloader::outputFile(const QString &url, const QVariantMap &data) const
+QString GoogleContactImageDownloader::outputFile(const QString &url,
+                                                 const QVariantMap &data,
+                                                 const QString &mimeType) const
 {
+    Q_UNUSED(mimeType); // TODO: use
     return staticOutputFile(data.value(IMAGE_DOWNLOADER_IDENTIFIER_KEY).toString(), url);
 }

@@ -20,7 +20,8 @@ VKContactImageDownloader::VKContactImageDownloader()
 
 QString VKContactImageDownloader::staticOutputFile(const QString &identifier, const QUrl &url)
 {
-    return makeOutputFile(SocialSyncInterface::VK, SocialSyncInterface::Contacts, identifier, url.toString());
+    return makeUrlOutputFile(SocialSyncInterface::VK, SocialSyncInterface::Contacts, identifier,
+                             url.toString(), QString());
 }
 
 QNetworkReply * VKContactImageDownloader::createReply(const QString &url,
@@ -34,7 +35,9 @@ QNetworkReply * VKContactImageDownloader::createReply(const QString &url,
     return d->networkAccessManager->get(request);
 }
 
-QString VKContactImageDownloader::outputFile(const QString &url, const QVariantMap &data) const
+QString VKContactImageDownloader::outputFile(const QString &url, const QVariantMap &data,
+                                             const QString &mimeType) const
 {
+    Q_UNUSED(mimeType); // TODO: use
     return staticOutputFile(data.value(IMAGE_DOWNLOADER_IDENTIFIER_KEY).toString(), url);
 }

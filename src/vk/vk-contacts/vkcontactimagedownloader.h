@@ -27,7 +27,7 @@ public:
 protected:
     QNetworkReply * createReply(const QString &url, const QVariantMap &metadata);
     // This is a reimplemented method, used by AbstractImageDownloader
-    QString outputFile(const QString &url, const QVariantMap &data) const;
+    QString outputFile(const QString &url, const QVariantMap &data, const QString &mimeType) const override;
 private:
     Q_DECLARE_PRIVATE(AbstractImageDownloader)
 };
