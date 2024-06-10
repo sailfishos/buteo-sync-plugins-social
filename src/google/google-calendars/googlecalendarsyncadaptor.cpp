@@ -1617,7 +1617,7 @@ const QList<QDateTime> GoogleCalendarSyncAdaptor::getExceptionInstanceDates(cons
 
     // Get all the instances of the event
     KCalendarCore::Incidence::List instances = m_calendar->instances(event);
-    for (const KCalendarCore::Incidence::Ptr incidence : instances) {
+    for (const KCalendarCore::Incidence::Ptr &incidence : instances) {
         if (incidence->hasRecurrenceId()) {
             // Record its recurrence Id
             exceptions += incidence->recurrenceId();
