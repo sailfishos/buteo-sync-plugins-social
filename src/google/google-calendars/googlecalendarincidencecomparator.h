@@ -129,7 +129,7 @@ namespace GoogleCalendarIncidenceComparator {
     bool incidencesEqual(const KCalendarCore::Incidence::Ptr &a, const KCalendarCore::Incidence::Ptr &b)
     {
         if (!a || !b) {
-            qWarning() << "Invalid paramters! a:" << a << "b:" << b;
+            qWarning() << "Invalid parameters! a:" << a << "b:" << b;
             return false;
         }
 
