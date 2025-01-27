@@ -297,7 +297,7 @@ void SocialNetworkSyncAdaptor::decrementSemaphore(int accountId)
     if (semaphoreValue == 0) {
         finalize(accountId);
 
-        // With the newer implementation, in finalize we can rereaise semaphores,
+        // With the newer implementation, in finalize we can raise semaphores,
         // so if after calling finalize, the semaphore count is not the same anymore,
         // we shouldn't update the sync timestamp
         if (m_accountSyncSemaphores.value(accountId) > 0) {
