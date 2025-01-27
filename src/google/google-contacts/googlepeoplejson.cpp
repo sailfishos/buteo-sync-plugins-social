@@ -49,7 +49,7 @@
 
 namespace {
 
-static const QString StarredContactGroupName = QStringLiteral("contactGroups/starred");
+const QString StarredContactGroupName = QStringLiteral("contactGroups/starred");
 
 QDate jsonObjectToDate(const QJsonObject &object, bool *ok)
 {

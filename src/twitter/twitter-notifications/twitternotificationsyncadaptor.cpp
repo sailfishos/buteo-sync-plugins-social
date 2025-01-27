@@ -360,7 +360,8 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
                           ? m_accountSyncProfile->key(Buteo::KEY_SYNC_SINCE_DAYS_PAST, QStringLiteral("7")).toInt()
                           : 7;
             if (!createdTime.isValid() || qAbs(createdTime.daysTo(QDateTime::currentDateTimeUtc())) > sinceSpan) {
-                qCDebug(lcSocialPlugin) << "retweet for account" << accountId << "is for tweet more than" << sinceSpan << "days old:" << createdTime << ", ignoring.";
+                qCDebug(lcSocialPlugin) << "retweet for account" << accountId << "is for tweet more than" << sinceSpan
+                                        << "days old:" << createdTime << ", ignoring.";
             } else if (retweetsCount > 0) {
                 retweetCounts.insert(retweetId, retweetsCount);
                 if (!dbRetweetCounts.contains(retweetId) || dbRetweetCounts.value(retweetId) < retweetsCount) {
@@ -388,7 +389,8 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
                 //: This label tells the user how many times (n) a single Tweet has been retweeted.  Include n.
                 //% "has been retweeted %n times"
                 notification->setBody(qtTrId("qtn_social_notifications_twitter_1_n_retweets_include_n", delta));
-                openUrlArgs << QLatin1String("https://mobile.twitter.com/") + selfUserScreenName + QLatin1String("/status/") + newlyRetweetedTweets.first();
+                openUrlArgs << QLatin1String("https://mobile.twitter.com/") + selfUserScreenName + QLatin1String("/status/")
+                               + newlyRetweetedTweets.first();
             } else {
                 //: This label refers to multiple Tweets by the user, eg: "Your Tweets" + "have been retweeted 5 times"
                 //% "Your Tweets"
