@@ -35,7 +35,7 @@
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
-#include <MGConfItem>
+#include <MDConfItem>
 
 // Update the following version if database schema changes e.g. new
 // fields are added to the existing tables.
@@ -521,11 +521,11 @@ bool DropboxImageSyncAdaptor::determineOptimalDimensions()
 {
     int width = 0, height = 0;
     const int defaultValue = 0;
-    MGConfItem widthConf("/lipstick/screen/primary/width");
+    MDConfItem widthConf("/lipstick/screen/primary/width");
     if (widthConf.value(defaultValue).toInt() != defaultValue) {
         width = widthConf.value(defaultValue).toInt();
     }
-    MGConfItem heightConf("/lipstick/screen/primary/height");
+    MDConfItem heightConf("/lipstick/screen/primary/height");
     if (heightConf.value(defaultValue).toInt() != defaultValue) {
         height = heightConf.value(defaultValue).toInt();
     }

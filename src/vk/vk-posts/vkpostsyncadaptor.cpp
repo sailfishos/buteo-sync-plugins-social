@@ -16,7 +16,7 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
 
-#include <MGConfItem>
+#include <MDConfItem>
 
 #define SOCIALD_VK_POSTS_ID_PREFIX QStringLiteral("vk-posts-")
 #define SOCIALD_VK_POSTS_GROUPNAME QStringLiteral("vk")
@@ -457,11 +457,11 @@ void VKPostSyncAdaptor::determineOptimalImageSize()
 {
     int width = 0, height = 0;
     const int defaultValue = 0;
-    MGConfItem widthConf("/lipstick/screen/primary/width");
+    MDConfItem widthConf("/lipstick/screen/primary/width");
     if (widthConf.value(defaultValue).toInt() != defaultValue) {
         width = widthConf.value(defaultValue).toInt();
     }
-    MGConfItem heightConf("/lipstick/screen/primary/height");
+    MDConfItem heightConf("/lipstick/screen/primary/height");
     if (heightConf.value(defaultValue).toInt() != defaultValue) {
         height = heightConf.value(defaultValue).toInt();
     }
