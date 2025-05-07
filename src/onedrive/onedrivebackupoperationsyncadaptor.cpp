@@ -327,7 +327,8 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
         } else if (httpCode != 200
                    && httpCode != 404
                    && httpCode != 410) {
-            errorMessage = QStringLiteral("Directory listing request at %1 for account %2 failed").arg(remotePath).arg(accountId);
+            errorMessage = QStringLiteral("Directory listing request at %1 for account %2 failed, http code: %3")
+                    .arg(remotePath).arg(accountId).arg(httpCode);
         }
 
         if (errorMessage.isEmpty()) {
