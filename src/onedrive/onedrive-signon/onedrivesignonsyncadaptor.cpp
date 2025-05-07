@@ -75,9 +75,9 @@ Accounts::Account *OneDriveSignonSyncAdaptor::loadAccount(int accountId)
     } else {
         acc = Accounts::Account::fromId(&m_accountManager, accountId, this);
         if (!acc) {
-            qCWarning(lcSocialPlugin) <<
-                    QString(QLatin1String("error: OneDrive account %1 was deleted during signon refresh sync"))
-                    .arg(accountId);
+            qCWarning(lcSocialPlugin)
+                    << QString(QLatin1String("error: OneDrive account %1 was deleted during signon refresh sync"))
+                       .arg(accountId);
             return 0;
         } else {
             m_accounts.insert(accountId, acc);
@@ -86,9 +86,9 @@ Accounts::Account *OneDriveSignonSyncAdaptor::loadAccount(int accountId)
 
     Accounts::Service srv = m_accountManager.service(syncServiceName());
     if (!srv.isValid()) {
-        qCWarning(lcSocialPlugin) <<
-                QString(QLatin1String("error: invalid service %1 specified for refresh sync with OneDrive account: %2"))
-                .arg(syncServiceName()).arg(accountId);
+        qCWarning(lcSocialPlugin)
+                << QString(QLatin1String("error: invalid service %1 specified for refresh sync with OneDrive account: %2"))
+                   .arg(syncServiceName()).arg(accountId);
         return 0;
     }
 
@@ -135,17 +135,17 @@ void OneDriveSignonSyncAdaptor::refreshTokens(int accountId)
     acc->selectService(srv);
     SignOn::Identity *identity = acc->credentialsId() > 0 ? SignOn::Identity::existingIdentity(acc->credentialsId()) : 0;
     if (!identity) {
-        qCWarning(lcSocialPlugin) <<
-                QString(QLatin1String("error: OneDrive account %1 has no valid credentials, cannot perform refresh sync"))
-                .arg(accountId);
+        qCWarning(lcSocialPlugin)
+                << QString(QLatin1String("error: OneDrive account %1 has no valid credentials, cannot perform refresh sync"))
+                   .arg(accountId);
         return;
     }
 
     Accounts::AccountService *accSrv = new Accounts::AccountService(acc, srv);
     if (!accSrv) {
-        qCWarning(lcSocialPlugin) <<
-                QString(QLatin1String("error: OneDrive account %1 has no valid account service, cannot perform refresh sync"))
-                .arg(accountId);
+        qCWarning(lcSocialPlugin)
+                << QString(QLatin1String("error: OneDrive account %1 has no valid account service, cannot perform refresh sync"))
+                   .arg(accountId);
         identity->deleteLater();
         return;
     }
@@ -154,9 +154,9 @@ void OneDriveSignonSyncAdaptor::refreshTokens(int accountId)
     QString mechanism = accSrv->authData().mechanism();
     SignOn::AuthSession *session = identity->createSession(method);
     if (!session) {
-        qCWarning(lcSocialPlugin) <<
-                QString(QLatin1String("error: could not create signon session for OneDrive account %1, cannot perform refresh sync"))
-                .arg(accountId);
+        qCWarning(lcSocialPlugin)
+                << QString(QLatin1String("error: could not create signon session for OneDrive account %1, cannot perform refresh sync"))
+                   .arg(accountId);
         accSrv->deleteLater();
         identity->deleteLater();
         return;
@@ -267,9 +267,9 @@ void OneDriveSignonSyncAdaptor::refreshTokenResponse(const SignOn::SessionData &
         session->deleteLater();
     }
 
-    qCInfo(lcSocialPlugin) <<
-            QString(QLatin1String("successfully performed signon refresh for OneDrive account %1: new ExpiresIn: %3"))
-            .arg(accountId).arg(responseData.getProperty("ExpiresIn").toInt());
+    qCInfo(lcSocialPlugin)
+            << QString(QLatin1String("successfully performed signon refresh for OneDrive account %1: new ExpiresIn: %3"))
+               .arg(accountId).arg(responseData.getProperty("ExpiresIn").toInt());
 
     lowerCredentialsNeedUpdateFlag(accountId);
     decrementSemaphore(accountId);
@@ -290,9 +290,9 @@ void OneDriveSignonSyncAdaptor::signonError(const SignOn::Error &error)
     }
 
     bool raiseFlag = error.type() == SignOn::Error::UserInteraction;
-    qCInfo(lcSocialPlugin) <<
-            QString(QLatin1String("got signon error when performing signon refresh for OneDrive account %1: %2: %3.  Raising flag? %4"))
-            .arg(accountId).arg(error.type()).arg(error.message()).arg(raiseFlag);
+    qCInfo(lcSocialPlugin)
+            << QString(QLatin1String("got signon error when performing signon refresh for OneDrive account %1: %2: %3.  Raising flag? %4"))
+               .arg(accountId).arg(error.type()).arg(error.message()).arg(raiseFlag);
 
     if (raiseFlag) {
         // UserInteraction error is returned if user interaction is required.
@@ -301,4 +301,3 @@ void OneDriveSignonSyncAdaptor::signonError(const SignOn::Error &error)
 
     decrementSemaphore(accountId);
 }
-

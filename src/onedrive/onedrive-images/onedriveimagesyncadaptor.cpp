@@ -343,9 +343,10 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
     const OneDriveAlbum::ConstPtr &dbAlbum = m_cachedAlbums.value(albumId);
     m_cachedAlbums.remove(albumId); // Removal detection
     m_seenAlbums.insert(albumId);
+
     if (!dbAlbum.isNull() && (dbAlbum->updatedTime().toTime_t() >= updatedTime.toTime_t())) {
-        qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << m_userId <<
-                          "from OneDrive account with id" << accountId << "doesn't need update";
+        qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << m_userId
+                                << "from OneDrive account with id" << accountId << "doesn't need update";
     } else {
         qCDebug(lcSocialPlugin) << "Album:" << albumName << "added or changed on server";
         const AlbumData album(albumId, m_userId, createdTime, updatedTime, albumName, photoCount);
@@ -377,7 +378,7 @@ bool OneDriveImageSyncAdaptor::initRemovalDetectionLists(int accountId)
     clearRemovalDetectionLists();
 
     bool ok = false;
-    QMap<int,QString> accounts = m_db.accounts(&ok);
+    QMap<int, QString> accounts = m_db.accounts(&ok);
     if (!ok) {
         return false;
     }

@@ -47,16 +47,13 @@
 
 namespace {
     bool filenameHasImageExtension(const QString &filename) {
-        if (filename.endsWith(".jpg", Qt::CaseInsensitive)  ||
-            filename.endsWith(".jpeg", Qt::CaseInsensitive) ||
-            filename.endsWith(".png", Qt::CaseInsensitive)  ||
-            filename.endsWith(".tiff", Qt::CaseInsensitive) ||
-            filename.endsWith(".tif", Qt::CaseInsensitive)  ||
-            filename.endsWith(".gif", Qt::CaseInsensitive)  ||
-            filename.endsWith(".bmp", Qt::CaseInsensitive)) {
-            return true;
-        }
-        return false;
+        return (filename.endsWith(".jpg", Qt::CaseInsensitive)
+                || filename.endsWith(".jpeg", Qt::CaseInsensitive)
+                || filename.endsWith(".png", Qt::CaseInsensitive)
+                || filename.endsWith(".tiff", Qt::CaseInsensitive)
+                || filename.endsWith(".tif", Qt::CaseInsensitive)
+                || filename.endsWith(".gif", Qt::CaseInsensitive)
+                || filename.endsWith(".bmp", Qt::CaseInsensitive));
     }
 }
 
@@ -211,8 +208,8 @@ void DropboxImageSyncAdaptor::cameraRollCursorFinishedHandler()
     const DropboxAlbum::ConstPtr &dbAlbum = m_cachedAlbums.value(albumId);
     m_cachedAlbums.remove(albumId); // this album exists, so remove it from the removal detection delta.
     if (!dbAlbum.isNull() && dbAlbum->hash() == cursor) {
-        qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << userId <<
-                          "from Dropbox account with id" << accountId << "doesn't need sync";
+        qCDebug(lcSocialPlugin) << "album with id" << albumId << "by user" << userId
+                                << "from Dropbox account with id" << accountId << "doesn't need sync";
         decrementSemaphore(accountId);
         return;
     }
@@ -222,7 +219,8 @@ void DropboxImageSyncAdaptor::cameraRollCursorFinishedHandler()
     decrementSemaphore(accountId);
 }
 
-void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &accessToken, const QString &albumId, const QString &cursor, const QString &continuationCursor)
+void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &accessToken, const QString &albumId,
+                                              const QString &cursor, const QString &continuationCursor)
 {
     QJsonObject requestParameters;
     if (continuationCursor.isEmpty()) {
@@ -538,6 +536,7 @@ bool DropboxImageSyncAdaptor::determineOptimalDimensions()
         m_optimalThumbnailWidth = (maxDimension / 2);
     }
     m_optimalImageWidth = maxDimension;
-    qCDebug(lcSocialPlugin) << "Determined optimal image dimension:" << m_optimalImageWidth << ", thumbnail:" << m_optimalThumbnailWidth;
+    qCDebug(lcSocialPlugin) << "Determined optimal image dimension:" << m_optimalImageWidth
+                            << ", thumbnail:" << m_optimalThumbnailWidth;
     return true;
 }

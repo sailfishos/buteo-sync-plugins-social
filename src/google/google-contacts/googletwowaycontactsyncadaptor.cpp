@@ -693,14 +693,13 @@ void GoogleTwoWayContactSyncAdaptor::upsyncLocalChanges(const QList<QContact> &l
 
     m_batchUpdateIndexes.clear();
 
-    qCInfo(lcSocialPlugin) << "Google account:" << m_accountId <<
-                     "upsyncing local contact A/M/R:"
-                     << m_localAdds.count()  << "/"
-                     << m_localMods.count()  << "/"
+    qCInfo(lcSocialPlugin) << "Google account:" << m_accountId << "upsyncing local contact A/M/R:"
+                     << m_localAdds.count() << "/"
+                     << m_localMods.count() << "/"
                      << m_localDels.count()
                      << "and local avatar A/M/R:"
-                     << m_localAvatarAdds.count()  << "/"
-                     << m_localAvatarMods.count()  << "/"
+                     << m_localAvatarAdds.count() << "/"
+                     << m_localAvatarMods.count() << "/"
                      << m_localAvatarDels.count();
 
     upsyncLocalChangesList();
@@ -818,8 +817,8 @@ void GoogleTwoWayContactSyncAdaptor::postFinishedHandler()
     removeReplyTimeout(m_accountId, reply);
 
     if (reply->property("isError").toBool()) {
-        qCWarning(lcSocialPlugin) << "error occurred posting contact data to google with account" << m_accountId << "," <<
-                          "got response:" << QString::fromUtf8(response);
+        qCWarning(lcSocialPlugin) << "error occurred posting contact data to google with account" << m_accountId
+                                  << "," << "got response:" << QString::fromUtf8(response);
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(m_accountId);
         return;

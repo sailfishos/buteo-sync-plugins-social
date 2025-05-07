@@ -75,6 +75,4 @@ private:
     QString m_serviceName;
 };
 
-
-
 #endif // SOCIALDPLUGIN_H

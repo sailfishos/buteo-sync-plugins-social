@@ -141,9 +141,8 @@ bool SocialNetworkSyncAdaptor::checkAccount(Accounts::Account *account)
     bool globallyEnabled = account->enabled();
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     if (!srv.isValid()) {
-        qCInfo(lcSocialPlugin) << "invalid service" << syncServiceName() <<
-                         "specified, account" << account->id() <<
-                         "will be disabled for" << m_serviceName << dataTypeName(m_dataType) << "sync";
+        qCInfo(lcSocialPlugin) << "invalid service" << syncServiceName() << "specified, account" << account->id()
+                               << "will be disabled for" << m_serviceName << dataTypeName(m_dataType) << "sync";
         return false;
     }
     account->selectService(srv);
@@ -265,8 +264,8 @@ void SocialNetworkSyncAdaptor::setInitialActive(bool enabled)
 void SocialNetworkSyncAdaptor::setFinishedInactive()
 {
     finalCleanup();
-    qCInfo(lcSocialPlugin) << "Finished" << m_serviceName << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                     "sync at:" << QDateTime::currentDateTime().toString(Qt::ISODate);
+    qCInfo(lcSocialPlugin) << "Finished" << m_serviceName << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                           << "sync at:" << QDateTime::currentDateTime().toString(Qt::ISODate);
     setStatus(SocialNetworkSyncAdaptor::Inactive);
 }
 

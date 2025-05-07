@@ -106,7 +106,8 @@ void TwitterNotificationSyncAdaptor::finalize(int accountId)
     }
 }
 
-void TwitterNotificationSyncAdaptor::requestNotifications(int accountId, const QString &oauthToken, const QString &oauthTokenSecret, const QString &sinceTweetId, const QString &followersCursor)
+void TwitterNotificationSyncAdaptor::requestNotifications(int accountId, const QString &oauthToken, const QString &oauthTokenSecret,
+                                                          const QString &sinceTweetId, const QString &followersCursor)
 {
     if (followersCursor.isEmpty()) {
         // request mentions
@@ -310,8 +311,8 @@ void TwitterNotificationSyncAdaptor::finishedMentionsHandler()
         }
     } else {
         // error occurred during request.
-        qCWarning(lcSocialPlugin) << "unable to parse mention notification data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData());
+        qCWarning(lcSocialPlugin) << "unable to parse mention notification data from request with account" << accountId
+                                  << "," << "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -410,8 +411,8 @@ void TwitterNotificationSyncAdaptor::finishedRetweetsHandler()
         }
     } else {
         // error occurred during request.
-        qCWarning(lcSocialPlugin) << "unable to parse retweet notification data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData());
+        qCWarning(lcSocialPlugin) << "unable to parse retweet notification data from request with account" << accountId
+                                  << "," << "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.
@@ -527,8 +528,8 @@ void TwitterNotificationSyncAdaptor::finishedFollowersHandler()
         }
     } else {
         // error occurred during request.
-        qCWarning(lcSocialPlugin) << "unable to parse mention notification data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData());
+        qCWarning(lcSocialPlugin) << "unable to parse mention notification data from request with account" << accountId
+                                  << "," << "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.

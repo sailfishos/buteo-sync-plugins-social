@@ -162,8 +162,8 @@ void VKCalendarSyncAdaptor::finalize(int accountId)
         }
 
         // finished!
-        qCInfo(lcSocialPlugin) << "finished calendars sync with VK account" << accountId <<
-                         ": got A/M/R:" << addedCount << "/" << modifiedCount << "/" << removedCount;
+        qCInfo(lcSocialPlugin) << "finished calendars sync with VK account" << accountId
+                               << ": got A/M/R:" << addedCount << "/" << modifiedCount << "/" << removedCount;
     }
 }
 
@@ -330,8 +330,8 @@ void VKCalendarSyncAdaptor::finishedHandler()
         }
 
         // error occurred during request.
-        qCWarning(lcSocialPlugin) << "unable to parse calendar data from request with account" << accountId <<
-                          "; got:" << QString::fromUtf8(replyData);
+        qCWarning(lcSocialPlugin) << "unable to parse calendar data from request with account" << accountId
+                                  << "; got:" << QString::fromUtf8(replyData);
     }
 
     // we're finished this request.  Decrement our busy semaphore.

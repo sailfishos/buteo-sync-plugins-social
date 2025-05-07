@@ -141,8 +141,8 @@ void VKNotificationSyncAdaptor::finishedHandler()
         }
     } else {
         // error occurred during request.
-        qCWarning(lcSocialPlugin) << "error: unable to parse notification data from request with account:" << accountId <<
-                          "got:" << QString::fromUtf8(replyData);
+        qCWarning(lcSocialPlugin) << "error: unable to parse notification data from request with account:" << accountId
+                                  << "got:" << QString::fromUtf8(replyData);
     }
 
     // we're finished this request.  Decrement our busy semaphore.

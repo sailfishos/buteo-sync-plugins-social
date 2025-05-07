@@ -139,8 +139,8 @@ void FacebookSignonSyncAdaptor::requestFinishedHandler()
                     || errorCode == 10
                     || (errorCode >= 200 && errorCode <= 299)) {
                 // the account is in a state which requires user intervention
-                qCWarning(lcSocialPlugin) << "access token has expired for Facebook account" << accountId <<
-                                  ":" <<  errorCode << "," << errorType << "," << errorMessage;
+                qCWarning(lcSocialPlugin) << "access token has expired for Facebook account" << accountId
+                                          << ":" <<  errorCode << "," << errorType << "," << errorMessage;
                 forceTokenExpiry(0, accountId, accessToken);
             } else {
                 // other error (downtime / service disruption / etc)
@@ -184,8 +184,8 @@ Accounts::Account *FacebookSignonSyncAdaptor::loadAccount(int accountId)
 
     Accounts::Service srv = m_accountManager.service(syncServiceName());
     if (!srv.isValid()) {
-        qCWarning(lcSocialPlugin) << "invalid service" << syncServiceName() <<
-                          "specified for refresh sync with Facebook account" << accountId;
+        qCWarning(lcSocialPlugin) << "invalid service" << syncServiceName()
+                                  << "specified for refresh sync with Facebook account" << accountId;
         return 0;
     }
 
@@ -285,8 +285,8 @@ void FacebookSignonSyncAdaptor::forceTokenExpiryResponse(const SignOn::SessionDa
         vmrd.insert(key, responseData.getProperty(key));
     }
 
-    qCDebug(lcSocialPlugin) << "forcibly updated cache for Facebook account" << accountId << "," <<
-                      "ExpiresIn now:" << vmrd.value("ExpiresIn").toInt() << ", expected" << seconds;
+    qCDebug(lcSocialPlugin) << "forcibly updated cache for Facebook account" << accountId
+                            << "," << "ExpiresIn now:" << vmrd.value("ExpiresIn").toInt() << ", expected" << seconds;
 
     if (seconds == 0) {
         // successfully forced expiry
@@ -305,8 +305,8 @@ void FacebookSignonSyncAdaptor::forceTokenExpiryError(const SignOn::Error &error
     int accountId = session->property("accountId").toInt();
     int seconds = session->property("seconds").toInt();
 
-    qCInfo(lcSocialPlugin) << "got signon error when performing force-expire for Facebook account" <<
-                     accountId << ":" << error.type() << "," << error.message();
+    qCInfo(lcSocialPlugin) << "got signon error when performing force-expire for Facebook account"
+                           << accountId << ":" << error.type() << "," << error.message();
 
     if (seconds == 0) {
         // we treat the error as if it was a success, since we need to update the credentials anyway.

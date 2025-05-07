@@ -37,8 +37,7 @@
 #include <socialcache/onedriveimagesdatabase.h>
 #include <socialcache/socialimagesdatabase.h>
 
-class OneDriveImageSyncAdaptor
-        : public OneDriveDataTypeSyncAdaptor
+class OneDriveImageSyncAdaptor : public OneDriveDataTypeSyncAdaptor
 {
     Q_OBJECT
 

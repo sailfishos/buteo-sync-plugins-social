@@ -1386,20 +1386,20 @@ void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const 
     const bool needCleanSync = isCleanSync(calendarId);
 
     if (!needCleanSync) {
-        qCDebug(lcSocialPlugin) << "Previous sync time for Google account:" << m_accountId <<
-                          "Calendar Id:" << calendarId <<
-                          "- Times:" << syncDate.toString() <<
-                          "- SyncToken:" << syncToken;
+        qCDebug(lcSocialPlugin) << "Previous sync time for Google account:" << m_accountId
+                                << "Calendar Id:" << calendarId
+                                << "- Times:" << syncDate.toString()
+                                << "- SyncToken:" << syncToken;
     } else if (syncDate.isValid() && syncToken.isEmpty()) {
-        qCDebug(lcSocialPlugin) << "Clean sync required for Google account:" << m_accountId <<
-                          "Calendar Id:" << calendarId <<
-                          "- Ignoring last sync time:" << syncDate.toString();
+        qCDebug(lcSocialPlugin) << "Clean sync required for Google account:" << m_accountId
+                                << "Calendar Id:" << calendarId
+                                << "- Ignoring last sync time:" << syncDate.toString();
         syncDate = QDateTime();
     } else {
-        qCDebug(lcSocialPlugin) << "Invalid previous sync time for Google account:" << m_accountId <<
-                          "Calendar Id:" << calendarId <<
-                          "- Time:" << syncDate.toString() <<
-                          "- SyncToken:" << syncToken;
+        qCDebug(lcSocialPlugin) << "Invalid previous sync time for Google account:" << m_accountId
+                                << "Calendar Id:" << calendarId
+                                << "- Time:" << syncDate.toString()
+                                << "- SyncToken:" << syncToken;
     }
 
     QList<QPair<QString, QString> > queryItems;
@@ -1454,8 +1454,8 @@ void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const 
 
         setupReplyTimeout(m_accountId, reply);
     } else {
-        qCWarning(lcSocialPlugin) << "unable to request events for calendar" << calendarId <<
-                          "from Google account with id" << m_accountId;
+        qCWarning(lcSocialPlugin) << "unable to request events for calendar" << calendarId
+                                  << "from Google account with id" << m_accountId;
         m_syncSucceeded = false;
         decrementSemaphore(m_accountId);
     }
@@ -1528,7 +1528,8 @@ void GoogleCalendarSyncAdaptor::eventsFinishedHandler()
             // HTTP 410 GONE is emitted if the syncToken or timeMin parameters are invalid.
             // We should trigger a clean sync with this notebook if we hit this error.
             const QString reason = getErrorReason(replyData);
-            qCWarning(lcSocialPlugin) << "received 410 GONE" << reason << "from server; marking calendar" << calendarId << "from account" << m_accountId << "for clean sync";
+            qCWarning(lcSocialPlugin) << "received 410 GONE" << reason << "from server; marking calendar" << calendarId
+                                      << "from account" << m_accountId << "for clean sync";
             nextSyncToken.clear();
             if (reason == ERROR_REASON_UPDATE_MIN_TOO_OLD) {
                 m_timeMinFailure.insert(calendarId);
@@ -1642,20 +1643,20 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
     mKCal::Notebook::Ptr googleNotebook = notebookForCalendarId(calendarId);
     if (googleNotebook.isNull()) {
         // this is a new, never before seen calendar.
-        qCInfo(lcSocialPlugin) << "No local calendar exists for:" << calendarId <<
-                         "for account:" << m_accountId << ".  No upsync possible.";
+        qCInfo(lcSocialPlugin) << "No local calendar exists for:" << calendarId
+                               << "for account:" << m_accountId << ".  No upsync possible.";
         upsyncEnabled = false;
     } else if (!m_accountSyncProfile || m_accountSyncProfile->syncDirection() == Buteo::SyncProfile::SYNC_DIRECTION_FROM_REMOTE) {
-        qCInfo(lcSocialPlugin) << "skipping upload of local calendar changes to" << calendarId <<
-                         "due to profile direction setting for account" << m_accountId;
+        qCInfo(lcSocialPlugin) << "skipping upload of local calendar changes to" << calendarId
+                               << "due to profile direction setting for account" << m_accountId;
         upsyncEnabled = false;
     } else if (!since.isValid()) {
-        qCInfo(lcSocialPlugin) << "Delta upsync with Google calendar" << calendarId <<
-                         "for account" << m_accountId << "not required due to clean sync";
+        qCInfo(lcSocialPlugin) << "Delta upsync with Google calendar" << calendarId
+                               << "for account" << m_accountId << "not required due to clean sync";
         upsyncEnabled = false;
     } else {
-        qCInfo(lcSocialPlugin) << "Delta upsync with Google calendar" << calendarId <<
-                         "for account" << m_accountId << "is enabled.";
+        qCInfo(lcSocialPlugin) << "Delta upsync with Google calendar" << calendarId
+                               << "for account" << m_accountId << "is enabled.";
         upsyncEnabled = true;
     }
 
@@ -1727,7 +1728,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                 partialUpsyncArtifactsNeedingUpdate.insert(gcalId);
             }
             if (gcalId.size() && eventPtr) {
-                qCDebug(lcSocialPluginTrace) << "Have local event:" << gcalId << "," << eventPtr->uid() << ":" << eventPtr->recurrenceId().toString();
+                qCDebug(lcSocialPluginTrace) << "Have local event:" << gcalId << "," << eventPtr->uid()
+                                             << ":" << eventPtr->recurrenceId().toString();
                 allMap.insert(gcalId, eventPtr);
             } // else, newly added locally, no gcalId yet.
         }
@@ -1808,7 +1810,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                 // currently existing base event or persistent occurrence which was deleted server-side
                 remoteRemovals++;
                 qCDebug(lcSocialPlugin) << "Have remote series deletion:" << eventId << "in" << calendarId;
-                m_changesFromDownsync.insertMulti(calendarId, qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::Delete, eventData));
+                m_changesFromDownsync.insertMulti(calendarId,
+                                                  qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::Delete, eventData));
                 if (updatedMap.contains(eventId)) {
                     qCDebug(lcSocialPlugin) << "Discarding local event modification:" << eventId << "due to remote deletion";
                     updatedMap.remove(eventId); // discard any local modifications to this event, don't upsync.
@@ -1837,9 +1840,11 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                 // TODO: use a more optimal conflict resolution strategy for this case!
                 remoteRemovals++;
                 qCDebug(lcSocialPlugin) << "Have remote occurrence deletion:" << eventId << "in" << calendarId;
-                m_changesFromDownsync.insertMulti(calendarId, qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::DeleteOccurrence, eventData));
+                m_changesFromDownsync.insertMulti(calendarId,
+                                                  qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::DeleteOccurrence, eventData));
                 if (updatedMap.contains(parentId)) {
-                    qCDebug(lcSocialPlugin) << "Discarding local modification to recurrence series:" << parentId << "due to remote EXDATE addition. Sub-optimal resolution strategy!";
+                    qCDebug(lcSocialPlugin) << "Discarding local modification to recurrence series:" << parentId
+                                            << "due to remote EXDATE addition. Sub-optimal resolution strategy!";
                     updatedMap.remove(parentId);
                     discardedLocalModifications++;
                 }
@@ -1853,7 +1858,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                     }
                     const QString &gcalId(gCalEventId(addedEvent));
                     if (gcalId == eventId) {
-                        qCDebug(lcSocialPlugin) << "Discarding local event addition:" << addedEvent->uid() << "due to remote EXDATE addition.  Sub-optimal resolution strategy!";
+                        qCDebug(lcSocialPlugin) << "Discarding local event addition:" << addedEvent->uid()
+                                                << "due to remote EXDATE addition.  Sub-optimal resolution strategy!";
                         addedList.remove(i);
                         discardedLocalAdditions++;
                         break;
@@ -1863,7 +1869,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                 // !allMap.contains(parentId)
                 if (deletedMap.contains(eventId)) {
                     // remote deleted event was also deleted locally, can ignore.
-                    qCDebug(lcSocialPlugin) << "Event deleted remotely:" << eventId << "was already deleted locally; discarding both local and remote deletion";
+                    qCDebug(lcSocialPlugin) << "Event deleted remotely:" << eventId
+                                            << "was already deleted locally; discarding both local and remote deletion";
                     deletedMap.remove(eventId); // discard local deletion.
                     discardedLocalRemovals++;
                     discardedRemoteRemovals++;
@@ -1871,7 +1878,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                     // remote deleted event never existed locally.
                     // this can happen due to the increased timeMin window
                     // extending to prior to the account existing on the device.
-                    qCDebug(lcSocialPlugin) << "Event deleted remotely:" << eventId << "was never downsynced to device; discarding";
+                    qCDebug(lcSocialPlugin) << "Event deleted remotely:" << eventId
+                                            << "was never downsynced to device; discarding";
                     discardedRemoteRemovals++;
                 }
             }
@@ -1890,10 +1898,12 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                 // Note: this will lose any local changes made since it was partially-upsynced,
                 // however the alternative is to lose remote changes made since then...
                 // So we stick with our "prefer-remote" conflict resolution strategy here.
-                qCDebug(lcSocialPlugin) << "Reloading partial upsync artifact:" << eventId << "from server as a modification";
+                qCDebug(lcSocialPlugin) << "Reloading partial upsync artifact:" << eventId
+                                        << "from server as a modification";
                 changed = true;
             } else {
-                qCDebug(lcSocialPlugin) << "Determining if remote data differs from local data for event" << eventId << "in" << calendarId;
+                qCDebug(lcSocialPlugin) << "Determining if remote data differs from local data for event" << eventId
+                                        << "in" << calendarId;
                 if (event.isNull()) {
                     qCDebug(lcSocialPlugin) << "Unable to find local event:" << eventId << ", marking as changed.";
                     changed = true;
@@ -1910,7 +1920,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             } else {
                 qCDebug(lcSocialPlugin) << "Have remote modification:" << eventId << "in" << calendarId;
                 remoteModifications++;
-                m_changesFromDownsync.insertMulti(calendarId, qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::Modify, eventData));
+                m_changesFromDownsync.insertMulti(calendarId,
+                                                  qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::Modify, eventData));
                 if (updatedMap.contains(eventId)) {
                     // if both local and server were modified, prefer server.
                     qCDebug(lcSocialPlugin) << "Discarding local event modification:" << eventId << "due to remote modification";
@@ -1940,15 +1951,16 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             // which would have been reported from the remote server as additions.
             qCDebug(lcSocialPlugin) << "Have remote addition:" << eventId << "in" << calendarId;
             remoteAdditions++;
-            m_changesFromDownsync.insertMulti(calendarId, qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::Insert, eventData));
+            m_changesFromDownsync.insertMulti(calendarId,
+                                              qMakePair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject>(GoogleCalendarSyncAdaptor::Insert, eventData));
             remoteAdditionIds.append(eventId);
         }
     }
 
-    qCInfo(lcSocialPlugin) << "Delta downsync from Google calendar" << calendarId << "for account" << m_accountId << ":" <<
-                     "remote A/M/R: " << remoteAdditions << "/" << remoteModifications << "/" << remoteRemovals <<
-                     "after discarding M/R:" << discardedRemoteModifications << "/" << discardedRemoteRemovals <<
-                     "due to local deletions or identical data";
+    qCInfo(lcSocialPlugin) << "Delta downsync from Google calendar" << calendarId << "for account" << m_accountId
+                           << ":" << "remote A/M/R: " << remoteAdditions << "/" << remoteModifications
+                           << "/" << remoteRemovals << "after discarding M/R:" << discardedRemoteModifications
+                           << "/" << discardedRemoteRemovals << "due to local deletions or identical data";
 
     if (upsyncEnabled) {
         // Now build the local-changes-to-upsync data structures.
@@ -1977,12 +1989,16 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             if (event) {
                 QJsonObject localEventData = kCalToJson(event, m_icalFormat);
                 if (unchangedRemoteModifications.contains(updatedGcalId)
-                        && !localModificationIsReal(localEventData, unchangedRemoteModifications.value(updatedGcalId), m_serverCalendarIdToDefaultReminderTimes.value(calendarId), m_icalFormat)) {
+                        && !localModificationIsReal(localEventData,
+                                                    unchangedRemoteModifications.value(updatedGcalId),
+                                                    m_serverCalendarIdToDefaultReminderTimes.value(calendarId),
+                                                    m_icalFormat)) {
                     // this local modification is spurious.  It may have been reported
                     // due to the timestamp resolution issue, but in any case the
                     // event does not differ from the remote one.
-                    qCDebug(lcSocialPlugin) << "Discarding local event modification:" << event->uid() << event->recurrenceId().toString()
-                                      << "as spurious, for gcalId:" << updatedGcalId;
+                    qCDebug(lcSocialPlugin) << "Discarding local event modification:" << event->uid()
+                                            << event->recurrenceId().toString()
+                                            << "as spurious, for gcalId:" << updatedGcalId;
                     discardedLocalModifications++;
                     continue;
                 }
@@ -2033,7 +2049,8 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                         // this event was previously downsynced from the remote in the last sync cycle.
                         // check to see whether it has changed locally since we downsynced it.
                         if (event->lastModified() < since) {
-                            qCDebug(lcSocialPlugin) << "Discarding local event addition:" << event->uid() << event->recurrenceId().toString() << "as spurious due to downsync, for gcalId:" << gcalId;
+                            qCDebug(lcSocialPlugin) << "Discarding local event addition:" << event->uid() << event->recurrenceId().toString()
+                                                    << "as spurious due to downsync, for gcalId:" << gcalId;
                             qCDebug(lcSocialPlugin) << "Last modified:" << event->lastModified() << "<" << since;
                             discardedLocalModifications++;
                             continue;
@@ -2055,7 +2072,7 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
                         // due to the timestamp resolution issue, but in any case the
                         // event does not differ from the remote one which is already updated.
                         qCDebug(lcSocialPlugin) << "Discarding local event modification:" << event->uid() << event->recurrenceId().toString()
-                                          << "as spurious, for gcalId:" << gcalId;
+                                                << "as spurious, for gcalId:" << gcalId;
                         discardedLocalModifications++;
                         continue;
                     }
@@ -2081,10 +2098,10 @@ QList<GoogleCalendarSyncAdaptor::UpsyncChange> GoogleCalendarSyncAdaptor::determ
             }
         }
 
-        qCInfo(lcSocialPlugin) << "Delta upsync with Google calendar" << calendarId << "for account" << m_accountId << ":" <<
-                         "local A/M/R:" << localAdded << "/" << localModified << "/" << localRemoved <<
-                         "after discarding A/M/R:" << discardedLocalAdditions << "/" << discardedLocalModifications << "/" << discardedLocalRemovals <<
-                         "due to remote changes or identical data";
+        qCInfo(lcSocialPlugin) << "Delta upsync with Google calendar" << calendarId << "for account" << m_accountId
+                               << ":" << "local A/M/R:" << localAdded << "/" << localModified << "/" << localRemoved
+                               << "after discarding A/M/R:" << discardedLocalAdditions << "/" << discardedLocalModifications
+                               << "/" << discardedLocalRemovals << "due to remote changes or identical data";
     }
 
     return changesToUpsync;
@@ -2209,14 +2226,14 @@ void GoogleCalendarSyncAdaptor::upsyncChanges(const UpsyncChange &changeToUpsync
 
         setupReplyTimeout(m_accountId, reply);
 
-        qCDebug(lcSocialPlugin) << "upsyncing change:" << upsyncTypeStr <<
-                          "to calendarId:" << calendarId <<
-                          "of account" << m_accountId << "to" <<
-                          request.url().toString();
+        qCDebug(lcSocialPlugin) << "upsyncing change:" << upsyncTypeStr
+                                << "to calendarId:" << calendarId
+                                << "of account" << m_accountId
+                                << "to" << request.url().toString();
         traceDumpStr(QString::fromUtf8(eventData));
     } else {
-        qCWarning(lcSocialPlugin) << "unable to request upsync for calendar" << calendarId <<
-                          "from Google account with id" << m_accountId;
+        qCWarning(lcSocialPlugin) << "unable to request upsync for calendar" << calendarId
+                                  << "from Google account with id" << m_accountId;
         m_syncSucceeded = false;
         decrementSemaphore(m_accountId);
     }
@@ -2245,7 +2262,8 @@ void GoogleCalendarSyncAdaptor::reInsertWithRandomId(const QNetworkReply *reply)
         QList<UpsyncChange> changesToUpsync = m_sequenced.values(eventId);
         m_sequenced.remove(eventId);
         for (UpsyncChange &changeToUpsync : changesToUpsync) {
-            qCDebug(lcSocialPlugin) << "Updating sequenced gcalId for event" << changeToUpsync.kcalEventId << "recurrenceId" << changeToUpsync.recurrenceId;
+            qCDebug(lcSocialPlugin) << "Updating sequenced gcalId for event" << changeToUpsync.kcalEventId
+                                    << "recurrenceId" << changeToUpsync.recurrenceId;
             changeToUpsync.eventData = jsonReplaceValue(changeToUpsync.eventData, "recurringEventId", insertionGcalId);
             m_sequenced.insertMulti(insertionGcalId, changeToUpsync);
         }
@@ -2342,7 +2360,8 @@ void GoogleCalendarSyncAdaptor::handleDeleteReply(QNetworkReply *reply)
         }
     } else {
         // This path should never be taken
-        qCWarning(lcSocialPlugin) << "error" << httpCode << "occurred while upsyncing calendar event deletion to Google account" << m_accountId << "; got:";
+        qCWarning(lcSocialPlugin) << "error" << httpCode
+                                  << "occurred while upsyncing calendar event deletion to Google account" << m_accountId << "; got:";
         errorDumpStr(QString::fromUtf8(replyData));
         m_syncSucceeded = false;
     }
@@ -2363,8 +2382,8 @@ void GoogleCalendarSyncAdaptor::handleInsertModifyReply(QNetworkReply *reply)
         QString typeStr = upsyncType == GoogleCalendarSyncAdaptor::Insert
                         ? QString::fromLatin1("insertion")
                         : QString::fromLatin1("modification");
-        qCWarning(lcSocialPlugin) << "error occurred while upsyncing calendar event" << typeStr <<
-                          "to Google account" << m_accountId << "; got:";
+        qCWarning(lcSocialPlugin) << "error occurred while upsyncing calendar event" << typeStr
+                                  << "to Google account" << m_accountId << "; got:";
         errorDumpStr(QString::fromUtf8(replyData));
         flagUploadFailure(kcalEventId);
         m_syncSucceeded = false;
@@ -2382,7 +2401,8 @@ void GoogleCalendarSyncAdaptor::handleInsertModifyReply(QNetworkReply *reply)
             m_storage->loadNotebookIncidences(googleNotebook->uid());
             KCalendarCore::Event::Ptr event = m_calendar->event(kcalEventId, recurrenceId);
             if (!event) {
-                qCWarning(lcSocialPlugin) << "event" << kcalEventId << recurrenceId.toString() << "was deleted locally during sync of Google account with id" << m_accountId;
+                qCWarning(lcSocialPlugin) << "event" << kcalEventId << recurrenceId.toString()
+                                          << "was deleted locally during sync of Google account with id" << m_accountId;
                 m_syncSucceeded = false;
             } else {
                 qCDebug(lcSocialPluginTrace) << "Local upsync response json:";
@@ -2455,7 +2475,8 @@ void GoogleCalendarSyncAdaptor::setCalendarProperties(
         const QString &syncProfile,
         const QString &ownerEmail)
 {
-    notebook->setIsReadOnly(calendarInfo.access == GoogleCalendarSyncAdaptor::Reader || calendarInfo.access == GoogleCalendarSyncAdaptor::FreeBusyReader);
+    notebook->setIsReadOnly(calendarInfo.access == GoogleCalendarSyncAdaptor::Reader
+                            || calendarInfo.access == GoogleCalendarSyncAdaptor::FreeBusyReader);
     notebook->setName(calendarInfo.summary);
     notebook->setDescription(calendarInfo.description);
     notebook->setPluginName(QStringLiteral("google"));
@@ -2475,7 +2496,6 @@ void GoogleCalendarSyncAdaptor::setCalendarProperties(
         }
         notebook->setCustomProperty(SERVER_COLOR_PROPERTY, calendarInfo.color);
     }
-
 }
 
 void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
@@ -2493,6 +2513,7 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
         syncProfile = account->valueAsString(QStringLiteral("google.Calendars/profile_id"));
         account->deleteLater();
     }
+
     foreach (const QString &serverCalendarId, m_serverCalendarIdToCalendarInfo.keys()) {
         const CalendarInfo calendarInfo = m_serverCalendarIdToCalendarInfo.value(serverCalendarId);
         const QString ownerEmail = (calendarInfo.access == GoogleCalendarSyncAdaptor::Owner) ? emailAddress : QString();
@@ -2522,7 +2543,8 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 qCDebug(lcSocialPlugin) << "Modifications required for local notebook for server calendar:" << serverCalendarId;
                 mKCal::Notebook::Ptr notebook = notebookForCalendarId(serverCalendarId);
                 if (notebook.isNull()) {
-                    qCWarning(lcSocialPlugin) << "unable to modify non-existent calendar:" << serverCalendarId << "for account:" << m_accountId;
+                    qCWarning(lcSocialPlugin) << "unable to modify non-existent calendar:" << serverCalendarId
+                                              << "for account:" << m_accountId;
                     m_syncSucceeded = false; // we don't return immediately, as we want to at least attempt to
                                              // apply other database modifications if possible, in order to leave
                                              // the local database in a usable state even after failed sync.
@@ -2535,7 +2557,8 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
                 qCDebug(lcSocialPlugin) << "Deleting local notebook for deleted server calendar:" << serverCalendarId;
                 mKCal::Notebook::Ptr notebook = notebookForCalendarId(serverCalendarId);
                 if (notebook.isNull()) {
-                    qCWarning(lcSocialPlugin) << "unable to delete non-existent calendar:" << serverCalendarId << "for account:" << m_accountId;
+                    qCWarning(lcSocialPlugin) << "unable to delete non-existent calendar:" << serverCalendarId
+                                              << "for account:" << m_accountId;
                     // m_syncSucceeded = false; // don't mark as failed, since the outcome is identical.
                 } else {
                     m_storage->deleteNotebook(notebook);
@@ -2543,7 +2566,8 @@ void GoogleCalendarSyncAdaptor::applyRemoteChangesLocally()
             } break;
             case GoogleCalendarSyncAdaptor::DeleteOccurrence: {
                 // this codepath should never be hit.
-                qCWarning(lcSocialPlugin) << "invalid DeleteOccurrence change reported for calendar:" << serverCalendarId << "from account:" << m_accountId;
+                qCWarning(lcSocialPlugin) << "invalid DeleteOccurrence change reported for calendar:" << serverCalendarId
+                                          << "from account:" << m_accountId;
             } break;
             case GoogleCalendarSyncAdaptor::CleanSync: {
                 qCDebug(lcSocialPlugin) << "Deleting and recreating local notebook for clean-sync server calendar:" << serverCalendarId;
@@ -2777,7 +2801,8 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(const QString 
     // Set notebook writeable locally.
     mKCal::Notebook::Ptr googleNotebook = notebookForCalendarId(calendarId);
     if (!googleNotebook) {
-        qCWarning(lcSocialPlugin) << "no local notebook associated with calendar:" << calendarId << "from account:" << m_accountId << "to update!";
+        qCWarning(lcSocialPlugin) << "no local notebook associated with calendar:" << calendarId
+                                  << "from account:" << m_accountId << "to update!";
         m_syncSucceeded = false;
         return;
     }
@@ -2830,7 +2855,8 @@ void GoogleCalendarSyncAdaptor::updateLocalCalendarNotebookEvents(const QString 
             const QPair<GoogleCalendarSyncAdaptor::ChangeType, QJsonObject> &remoteChange(changesFromDownsyncForCalendar[i]);
             QString parentId = remoteChange.second.value(QLatin1String("recurringEventId")).toVariant().toString();
             if (!parentId.isEmpty()) {
-                if (remoteChange.first == GoogleCalendarSyncAdaptor::Delete || remoteChange.first == GoogleCalendarSyncAdaptor::DeleteOccurrence) {
+                if (remoteChange.first == GoogleCalendarSyncAdaptor::Delete
+                        || remoteChange.first == GoogleCalendarSyncAdaptor::DeleteOccurrence) {
                     reorderedChangesFromDownsyncForCalendar.prepend(remoteChange);
                 } else {
                     reorderedChangesFromDownsyncForCalendar.append(remoteChange);
@@ -3136,4 +3162,3 @@ void GoogleCalendarSyncAdaptor::applySyncFailureFlags()
         ++iter;
     }
 }
-
