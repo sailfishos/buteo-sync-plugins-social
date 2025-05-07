@@ -26,8 +26,6 @@ Requires: buteo-syncfw-qt5-msyncd
 Requires: systemd
 Requires(pre):  sailfish-setup
 Requires(post): systemd
-Obsoletes: sociald < 0.4.0
-Provides: sociald
 
 %description
 A Buteo plugin which provides data synchronization with various social services.
@@ -35,12 +33,6 @@ A Buteo plugin which provides data synchronization with various social services.
 %package facebook
 Summary:    Provides synchronisation with Facebook
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-facebook-calendars < 0.4.0
-Obsoletes: sociald-facebook-images < 0.4.0
-Obsoletes: sociald-facebook-signon < 0.4.0
-Provides: sociald-facebook-calendars
-Provides: sociald-facebook-images
-Provides: sociald-facebook-signon
 
 %description facebook
 %{summary}.
@@ -48,12 +40,6 @@ Provides: sociald-facebook-signon
 %package google
 Summary:    Provides synchronisation with Google
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-google-calendars < 0.4.0
-Obsoletes: sociald-google-contacts < 0.4.0
-Obsoletes: sociald-google-signon < 0.4.0
-Provides: sociald-google-calendars
-Provides: sociald-google-contacts
-Provides: sociald-google-signon
 
 %description google
 %{summary}.
@@ -61,10 +47,6 @@ Provides: sociald-google-signon
 %package twitter
 Summary:    Provides synchronisation with Twitter
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-twitter-notifications < 0.4.0
-Obsoletes: sociald-twitter-posts < 0.4.0
-Provides: sociald-twitter-notifications
-Provides: sociald-twitter-posts
 
 %description twitter
 %{summary}.
@@ -72,12 +54,6 @@ Provides: sociald-twitter-posts
 %package onedrive
 Summary:    Provides synchronisation with OneDrive
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-onedrive-signon < 0.4.0
-Obsoletes: sociald-onedrive-images < 0.4.0
-Obsoletes: sociald-onedrive-backup < 0.4.0
-Provides: sociald-onedrive-signon
-Provides: sociald-onedrive-images
-Provides: sociald-onedrive-backup
 
 %description onedrive
 %{summary}.
@@ -85,16 +61,6 @@ Provides: sociald-onedrive-backup
 %package vk
 Summary:    Provides synchronisation with VK
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-vk-posts < 0.4.0
-Obsoletes: sociald-vk-notifications < 0.4.0
-Obsoletes: sociald-vk-calendars < 0.4.0
-Obsoletes: sociald-vk-contacts < 0.4.0
-Obsoletes: sociald-vk-images < 0.4.0
-Provides: sociald-vk-posts
-Provides: sociald-vk-notifications
-Provides: sociald-vk-calendars
-Provides: sociald-vk-contacts
-Provides: sociald-vk-images
 
 %description vk
 %{summary}.
@@ -102,10 +68,6 @@ Provides: sociald-vk-images
 %package dropbox
 Summary:    Provides synchronisation with Dropbox
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-dropbox-images < 0.4.0
-Obsoletes: sociald-dropbox-backup < 0.4.0
-Provides: sociald-dropbox-images
-Provides: sociald-dropbox-backup
 
 %description dropbox
 %{summary}.
@@ -113,8 +75,6 @@ Provides: sociald-dropbox-backup
 %package knowncontacts
 Summary: Store locally created contacts
 Requires: %{name} = %{version}-%{release}
-Obsoletes: sociald-knowncontacts < 0.4.0
-Provides: sociald-knowncontacts
 
 %description knowncontacts
 Buteo sync plugin that stores locally created contacts, such as email
