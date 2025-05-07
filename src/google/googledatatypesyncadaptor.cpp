@@ -54,8 +54,8 @@ GoogleDataTypeSyncAdaptor::~GoogleDataTypeSyncAdaptor()
 void GoogleDataTypeSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 {
     if (dataTypeString != SocialNetworkSyncAdaptor::dataTypeName(m_dataType)) {
-        qCWarning(lcSocialPlugin) << "Google" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                          "sync adaptor was asked to sync" << dataTypeString;
+        qCWarning(lcSocialPlugin) << "Google" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                                  << "sync adaptor was asked to sync" << dataTypeString;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -126,9 +126,9 @@ void GoogleDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
         qWarning() << "    Json body:" << QString::fromUtf8(jsonBody).replace('\r', ' ').replace('\n', ' ');
     }
 
-    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                      "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced error:" << err;
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                              << "request with account" << sender()->property("accountId").toInt()
+                              << "experienced error:" << err;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -143,9 +143,9 @@ void GoogleDataTypeSyncAdaptor::sslErrorsHandler(const QList<QSslError> &errs)
     if (errs.size() > 0) {
         sslerrs.chop(2);
     }
-    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                      "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced ssl errors:" << sslerrs;
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                              << "request with account" << sender()->property("accountId").toInt()
+                              << "experienced ssl errors:" << sslerrs;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     sender()->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -266,8 +266,8 @@ void GoogleDataTypeSyncAdaptor::signOnError(const SignOn::Error &error)
     Accounts::Account *account = session->property("account").value<Accounts::Account*>();
     SignOn::Identity *identity = session->property("identity").value<SignOn::Identity*>();
     int accountId = account->id();
-    qCWarning(lcSocialPlugin) << "credentials for account with id" << accountId <<
-                      "couldn't be retrieved:" << error.type() << error.message();
+    qCWarning(lcSocialPlugin) << "credentials for account with id" << accountId
+                              << "couldn't be retrieved:" << error.type() << error.message();
 
     // if the error is because credentials have expired, we
     // set the CredentialsNeedUpdate key.

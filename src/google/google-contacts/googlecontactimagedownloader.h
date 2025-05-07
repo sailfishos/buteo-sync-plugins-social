@@ -31,6 +31,7 @@
 #include <QUrl>
 
 class QNetworkReply;
+
 class GoogleContactImageDownloader: public AbstractImageDownloader
 {
     Q_OBJECT

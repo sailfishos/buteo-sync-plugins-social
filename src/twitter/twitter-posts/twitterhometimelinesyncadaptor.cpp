@@ -172,8 +172,8 @@ void TwitterHomeTimelineSyncAdaptor::finishedMeHandler()
 
         requestPosts(accountId, oauthToken, oauthTokenSecret, QString(), QString());
     } else {
-        qCWarning(lcSocialPlugin) << "unable to parse self user id from me request for account" << accountId << "," <<
-                          "got:" << replyData;
+        qCWarning(lcSocialPlugin) << "unable to parse self user id from me request for account" << accountId
+                                  << "," << "got:" << replyData;
     }
 
     decrementSemaphore(accountId);
@@ -262,9 +262,9 @@ void TwitterHomeTimelineSyncAdaptor::finishedPostsHandler()
                           ? m_accountSyncProfile->key(Buteo::KEY_SYNC_SINCE_DAYS_PAST, QStringLiteral("7")).toInt()
                           : 7;
             if (eventTimestamp.daysTo(QDateTime::currentDateTime()) > sinceSpan) {
-                qCDebug(lcSocialPlugin) << "tweet for account" << accountId <<
-                                  "is more than" << sinceSpan << "days old:" <<
-                                  eventTimestamp.toString(Qt::ISODate) << body;
+                qCDebug(lcSocialPlugin) << "tweet for account" << accountId
+                                        << "is more than" << sinceSpan
+                                        << "days old:" << eventTimestamp.toString(Qt::ISODate) << body;
             } else {
                 m_db.addTwitterPost(postId, name, body, eventTimestamp, icon, imageList,
                                     screenName, retweeter, consumerKey(), consumerSecret(), accountId);
@@ -272,8 +272,8 @@ void TwitterHomeTimelineSyncAdaptor::finishedPostsHandler()
         }
     } else {
         // error occurred during request.
-        qCWarning(lcSocialPlugin) << "unable to parse event feed data from request with account" << accountId << "," <<
-                          "got:" << QString::fromLatin1(replyData.constData());
+        qCWarning(lcSocialPlugin) << "unable to parse event feed data from request with account" << accountId
+                                  << "," << "got:" << QString::fromLatin1(replyData.constData());
     }
 
     // we're finished this request.  Decrement our busy semaphore.

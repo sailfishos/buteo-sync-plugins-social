@@ -50,6 +50,7 @@ class OneDriveDataTypeSyncAdaptor : public SocialNetworkSyncAdaptor
 public:
     OneDriveDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     virtual ~OneDriveDataTypeSyncAdaptor();
+
     virtual void sync(const QString &dataTypeString, int accountId);
 
 protected:

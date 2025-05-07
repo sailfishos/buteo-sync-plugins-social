@@ -54,8 +54,8 @@ DropboxDataTypeSyncAdaptor::~DropboxDataTypeSyncAdaptor()
 void DropboxDataTypeSyncAdaptor::sync(const QString &dataTypeString, int accountId)
 {
     if (dataTypeString != SocialNetworkSyncAdaptor::dataTypeName(m_dataType)) {
-        qCWarning(lcSocialPlugin) << "Dropbox" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                          "sync adaptor was asked to sync" << dataTypeString;
+        qCWarning(lcSocialPlugin) << "Dropbox" << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                                  << "sync adaptor was asked to sync" << dataTypeString;
         setStatus(SocialNetworkSyncAdaptor::Error);
         return;
     }
@@ -105,9 +105,9 @@ void DropboxDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
                          << reply->property("accountId").toInt() << "but could be spurious. Http code:" << httpCode;
     }
 
-    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                      "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced error:" << httpCode;
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                              << "request with account" << sender()->property("accountId").toInt()
+                              << "experienced error:" << httpCode;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     reply->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -122,9 +122,9 @@ void DropboxDataTypeSyncAdaptor::sslErrorsHandler(const QList<QSslError> &errs)
     if (errs.size() > 0) {
         sslerrs.chop(2);
     }
-    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType) <<
-                      "request with account" << sender()->property("accountId").toInt() <<
-                      "experienced ssl errors:" << sslerrs;
+    qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
+                              << "request with account" << sender()->property("accountId").toInt()
+                              << "experienced ssl errors:" << sslerrs;
     // set "isError" on the reply so that adapters know to ignore the result in the finished() handler
     sender()->setProperty("isError", QVariant::fromValue<bool>(true));
     // Note: not all errors are "unrecoverable" errors, so we don't change the status here.
@@ -208,7 +208,8 @@ void DropboxDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     // grab out a valid identity for the sync service.
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
-    SignOn::Identity *identity = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
+    SignOn::Identity *identity = account->credentialsId() > 0
+            ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
     if (!identity) {
         qCWarning(lcSocialPlugin) << "account" << accountId << "has no valid credentials; cannot sign in";
         decrementSemaphore(accountId);
@@ -249,8 +250,8 @@ void DropboxDataTypeSyncAdaptor::signOnError(const SignOn::Error &error)
     Accounts::Account *account = session->property("account").value<Accounts::Account*>();
     SignOn::Identity *identity = session->property("identity").value<SignOn::Identity*>();
     int accountId = account->id();
-    qCWarning(lcSocialPlugin) << "credentials for account with id" << accountId <<
-                      "couldn't be retrieved:" << error.type() << error.message();
+    qCWarning(lcSocialPlugin) << "credentials for account with id" << accountId
+                              << "couldn't be retrieved:" << error.type() << error.message();
 
     // if the error is because credentials have expired, we
     // set the CredentialsNeedUpdate key.

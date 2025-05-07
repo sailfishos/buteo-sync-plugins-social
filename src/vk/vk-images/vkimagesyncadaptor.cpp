@@ -360,12 +360,12 @@ void VKImageSyncAdaptor::albumsFinishedHandler()
             lastSyncTimestampForAlbum = qMax(dbAlbum->created(), dbAlbum->updated());
         }
         if (created > lastSyncTimestampForAlbum || updated > lastSyncTimestampForAlbum || (created == 0 && updated == 0)) {
-            qCDebug(lcSocialPlugin) << "Need to request photos for album:" << id << title << "with timestamps:" <<
-                              created << "+" << updated << ">" << lastSyncTimestampForAlbum;
+            qCDebug(lcSocialPlugin) << "Need to request photos for album:" << id << title
+                                    << "with timestamps:" << created << "+" << updated << ">" << lastSyncTimestampForAlbum;
             m_requestedPhotosForOwnerAndAlbum.append(QStringLiteral("%1:%2:%3").arg(ownerId).arg(id).arg(accountId));
         } else {
-            qCDebug(lcSocialPlugin) << "No need to request photos for album:" << id << title << "with timestamps:" <<
-                              created << "+" << updated << "<=" << lastSyncTimestampForAlbum;
+            qCDebug(lcSocialPlugin) << "No need to request photos for album:" << id << title
+                                    << "with timestamps:" << created << "+" << updated << "<=" << lastSyncTimestampForAlbum;
         }
 
         // request the information for user who owns this album if necessary

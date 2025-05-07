@@ -37,11 +37,13 @@
 #include <Accounts/Service>
 
 namespace {
-    static const QString SyncProfileTemplatesKey = QStringLiteral("sync_profile_templates");
-    static QString SyncProfileIdKey(const QString &templateProfileName)
+    const QString SyncProfileTemplatesKey = QStringLiteral("sync_profile_templates");
+
+    QString SyncProfileIdKey(const QString &templateProfileName)
     {
         return QStringLiteral("%1/%2").arg(templateProfileName).arg(Buteo::KEY_PROFILE_ID);
     }
+
     QString createProfile(Buteo::ProfileManager *profileManager,
                           const QString &templateProfileName,
                           Accounts::Account *account,
@@ -171,15 +173,13 @@ bool SocialdButeoPlugin::startSync()
     // purging any synced data associated with those accounts).
     if (m_socialNetworkSyncAdaptor && m_socialNetworkSyncAdaptor->enabled()) {
         if (m_socialNetworkSyncAdaptor->status() == SocialNetworkSyncAdaptor::Inactive) {
-            qCDebug(lcSocialPlugin) << "performing sync of" << m_dataTypeName <<
-                              "from" << m_socialServiceName <<
-                              "for account" << m_profileAccountId;
+            qCDebug(lcSocialPlugin) << "performing sync of" << m_dataTypeName << "from" << m_socialServiceName
+                                    << "for account" << m_profileAccountId;
             m_socialNetworkSyncAdaptor->sync(m_dataTypeName, m_profileAccountId);
             return true;
         } else {
-            qCDebug(lcSocialPlugin) << m_socialServiceName << "sync adaptor for" <<
-                              m_dataTypeName << "is still busy with last sync of account" <<
-                              m_profileAccountId;
+            qCDebug(lcSocialPlugin) << m_socialServiceName << "sync adaptor for" << m_dataTypeName
+                                    << "is still busy with last sync of account" << m_profileAccountId;
         }
     } else {
         qCDebug(lcSocialPlugin) << "no enabled" << m_socialServiceName << "sync adaptor for" << m_dataTypeName;
@@ -232,14 +232,21 @@ void SocialdButeoPlugin::syncStatusChanged()
         SocialNetworkSyncAdaptor::Status syncStatus = m_socialNetworkSyncAdaptor->status();
         // Busy change comes when sync starts -> let's ignore that.
         if (syncStatus == SocialNetworkSyncAdaptor::Inactive) {
-            updateResults(Buteo::SyncResults(QDateTime::currentDateTime(), Buteo::SyncResults::SYNC_RESULT_SUCCESS, Buteo::SyncResults::NO_ERROR));
+            updateResults(Buteo::SyncResults(QDateTime::currentDateTime(),
+                                             Buteo::SyncResults::SYNC_RESULT_SUCCESS,
+                                             Buteo::SyncResults::NO_ERROR));
             emit success(getProfileName(), QString("%1 update succeeded").arg(getProfileName()));
         } else if (syncStatus != SocialNetworkSyncAdaptor::Busy) {
-            updateResults(Buteo::SyncResults(QDateTime::currentDateTime(), Buteo::SyncResults::SYNC_RESULT_FAILED, Buteo::SyncResults::ABORTED));
-            emit error(getProfileName(), QString("%1 update failed").arg(getProfileName()), Buteo::SyncResults::ABORTED);
+            updateResults(Buteo::SyncResults(QDateTime::currentDateTime(),
+                                             Buteo::SyncResults::SYNC_RESULT_FAILED,
+                                             Buteo::SyncResults::ABORTED));
+            emit error(getProfileName(), QString("%1 update failed").arg(getProfileName()),
+                       Buteo::SyncResults::ABORTED);
         }
     } else {
-        updateResults(Buteo::SyncResults(QDateTime::currentDateTime(), Buteo::SyncResults::SYNC_RESULT_FAILED, Buteo::SyncResults::ABORTED));
+        updateResults(Buteo::SyncResults(QDateTime::currentDateTime(),
+                                         Buteo::SyncResults::SYNC_RESULT_FAILED,
+                                         Buteo::SyncResults::ABORTED));
         emit error(getProfileName(), QString("%1 update failed").arg(getProfileName()), Buteo::SyncResults::ABORTED);
     }
 }
@@ -297,15 +304,15 @@ QList<Buteo::SyncProfile*> SocialdButeoPlugin::ensurePerAccountSyncProfilesExist
 
         if (!foundProfile) {
             // it should have been generated for the account when the account was added.
-            qCInfo(lcSocialPlugin) << "no per-account" << profile().name() <<
-                             "sync profile exists for account:" << currAccount->id();
+            qCInfo(lcSocialPlugin) << "no per-account" << profile().name()
+                                   << "sync profile exists for account:" << currAccount->id();
 
             // create the per-account profile... we shouldn't need to do this...
             QString profileName = createProfile(&m_profileManager, profile().name(), currAccount, dataTypeSyncService, true, QVariantMap());
             Buteo::SyncProfile *newProfile = m_profileManager.syncProfile(profileName);
             if (!newProfile) {
-                qCWarning(lcSocialPlugin) << "unable to create per-account" << profile().name() <<
-                                  "sync profile for account:" << currAccount->id();
+                qCWarning(lcSocialPlugin) << "unable to create per-account" << profile().name()
+                                          << "sync profile for account:" << currAccount->id();
             } else {
                 // enable the sync schedule for the profile.
                 Buteo::SyncSchedule schedule = newProfile->syncSchedule();
