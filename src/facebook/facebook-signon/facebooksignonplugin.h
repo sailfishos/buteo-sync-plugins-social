@@ -36,7 +36,7 @@ public:
     ~FacebookSignonPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class FacebookSignonPluginLoader : public Buteo::SyncPluginLoader

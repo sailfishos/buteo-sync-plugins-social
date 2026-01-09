@@ -36,7 +36,7 @@ public:
     ~OneDriveSignonPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 

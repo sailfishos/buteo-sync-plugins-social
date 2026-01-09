@@ -50,14 +50,15 @@ class GoogleDataTypeSyncAdaptor : public SocialNetworkSyncAdaptor
 public:
     GoogleDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     virtual ~GoogleDataTypeSyncAdaptor();
-    virtual void sync(const QString &dataTypeString, int accountId);
+
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected:
     QString clientId();
     QString clientSecret();
     virtual void updateDataForAccount(int accountId);
     virtual void beginSync(int accountId, const QString &accessToken) = 0;
-    virtual void finalCleanup();
+    void finalCleanup() override;
 
 protected Q_SLOTS:
     virtual void errorHandler(QNetworkReply::NetworkError err);

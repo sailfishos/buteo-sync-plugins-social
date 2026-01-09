@@ -24,13 +24,13 @@ public:
     VKNotificationSyncAdaptor(QObject *parent);
     ~VKNotificationSyncAdaptor();
 
-    QString syncServiceName() const;
+    QString syncServiceName() const override;
 
 protected: // implementing VKDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
-    void retryThrottledRequest(const QString &request, const QVariantList &args, bool retryLimitReached);
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalize(int accountId) override;
+    void retryThrottledRequest(const QString &request, const QVariantList &args, bool retryLimitReached) override;
 
 private:
     void requestNotifications(int accountId, const QString &accessToken,

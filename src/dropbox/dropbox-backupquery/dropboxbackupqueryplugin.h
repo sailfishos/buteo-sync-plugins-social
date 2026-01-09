@@ -37,7 +37,7 @@ public:
     ~DropboxBackupQueryPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class DropboxBackupQueryPluginLoader : public Buteo::SyncPluginLoader

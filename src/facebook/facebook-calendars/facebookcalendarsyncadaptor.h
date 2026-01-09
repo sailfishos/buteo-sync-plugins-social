@@ -54,13 +54,13 @@ public:
     FacebookCalendarSyncAdaptor(QObject *parent);
     ~FacebookCalendarSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId);
+    QString syncServiceName() const override;
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected: // implementing FacebookDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalCleanup();
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalCleanup() override;
 
 private:
     void requestEvents(int accountId, const QString &accessToken,

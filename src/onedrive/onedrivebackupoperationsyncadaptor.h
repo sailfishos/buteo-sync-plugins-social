@@ -48,10 +48,10 @@ public:
     virtual OneDriveBackupOperationSyncAdaptor::Operation operation() const = 0;
 
 protected: // implementing OneDriveDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
-    void finalCleanup();
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalize(int accountId) override;
+    void finalCleanup() override;
 
 private:
     void initialiseAppFolderRequest(int accountId, const QString &accessToken,

@@ -35,7 +35,7 @@ public:
     ~GoogleCalendarsPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class GoogleCalendarPluginLoader : public Buteo::SyncPluginLoader

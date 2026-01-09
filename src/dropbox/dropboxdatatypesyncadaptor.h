@@ -50,7 +50,8 @@ class DropboxDataTypeSyncAdaptor : public SocialNetworkSyncAdaptor
 public:
     DropboxDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     virtual ~DropboxDataTypeSyncAdaptor();
-    virtual void sync(const QString &dataTypeString, int accountId);
+
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected:
     QString api() const;
@@ -59,7 +60,7 @@ protected:
     QString clientSecret();
     virtual void updateDataForAccount(int accountId);
     virtual void beginSync(int accountId, const QString &accessToken) = 0;
-    virtual void finalCleanup();
+    void finalCleanup() override;
 
 protected Q_SLOTS:
     virtual void errorHandler(QNetworkReply::NetworkError err);

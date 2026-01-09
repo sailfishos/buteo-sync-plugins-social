@@ -39,7 +39,7 @@ public:
 protected:
     QNetworkReply *createRequest(QNetworkAccessManager::Operation op,
                                  const QNetworkRequest &req,
-                                 QIODevice *outgoingData = 0);
+                                 QIODevice *outgoingData = 0) override;
 };
 
 #endif // SOCIALD_VK_QNAMFACTORY_P_H

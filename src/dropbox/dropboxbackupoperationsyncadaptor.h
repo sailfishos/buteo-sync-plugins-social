@@ -50,10 +50,10 @@ public:
     virtual DropboxBackupOperationSyncAdaptor::Operation operation() const = 0;
 
 protected: // implementing DropboxDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
-    void finalCleanup();
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalize(int accountId) override;
+    void finalCleanup() override;
 
 private:
     void requestList(int accountId,

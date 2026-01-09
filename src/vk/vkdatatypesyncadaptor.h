@@ -75,7 +75,8 @@ public:
 
     VKDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     virtual ~VKDataTypeSyncAdaptor();
-    virtual void sync(const QString &dataTypeString, int accountId);
+
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected:
     QString clientId();

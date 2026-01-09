@@ -36,7 +36,7 @@ public:
     ~GoogleSignonPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class GoogleSignonPluginLoader : public Buteo::SyncPluginLoader

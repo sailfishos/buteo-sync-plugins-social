@@ -48,13 +48,13 @@ public:
     GoogleSignonSyncAdaptor(QObject *parent);
     ~GoogleSignonSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId = 0);
+    QString syncServiceName() const override;
+    void sync(const QString &dataTypeString, int accountId = 0) override;
 
 protected: // implementing GoogleDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalize(int accountId) override;
 
 private Q_SLOTS:
     void initialSignonResponse(const SignOn::SessionData &responseData);

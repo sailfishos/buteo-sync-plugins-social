@@ -45,12 +45,12 @@ public:
     TwitterHomeTimelineSyncAdaptor(QObject *parent);
     ~TwitterHomeTimelineSyncAdaptor();
 
-    QString syncServiceName() const;
+    QString syncServiceName() const override;
 
 protected: // implementing TwitterDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &oauthToken, const QString &oauthTokenSecret);
-    void finalize(int accountId);
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &oauthToken, const QString &oauthTokenSecret) override;
+    void finalize(int accountId) override;
 
 private:
     void requestMe(int accountId, const QString &oauthToken, const QString &oauthTokenSecret);

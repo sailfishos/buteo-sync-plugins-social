@@ -46,15 +46,15 @@ public:
                        const QString &dataTypeName);
     virtual ~SocialdButeoPlugin();
 
-    bool init();
-    bool uninit();
-    bool startSync();
-    void abortSync(Sync::SyncStatus status = Sync::SYNC_ABORTED);
-    Buteo::SyncResults getSyncResults() const;
-    bool cleanUp();
+    bool init() override;
+    bool uninit() override;
+    bool startSync() override;
+    void abortSync(Sync::SyncStatus status = Sync::SYNC_ABORTED) override;
+    Buteo::SyncResults getSyncResults() const override;
+    bool cleanUp() override;
 
 public Q_SLOTS:
-    void connectivityStateChanged(Sync::ConnectivityType type, bool state);
+    void connectivityStateChanged(Sync::ConnectivityType type, bool state) override;
 
 private Q_SLOTS:
     void syncStatusChanged();

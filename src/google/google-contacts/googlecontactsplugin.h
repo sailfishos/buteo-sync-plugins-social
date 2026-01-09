@@ -36,7 +36,7 @@ public:
     ~GoogleContactsPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class GoogleContactsPluginLoader : public Buteo::SyncPluginLoader

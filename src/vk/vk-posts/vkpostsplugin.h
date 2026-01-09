@@ -23,7 +23,7 @@ public:
     ~VKPostsPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class VKPostsPluginLoader : public Buteo::SyncPluginLoader

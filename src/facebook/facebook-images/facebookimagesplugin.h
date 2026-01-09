@@ -36,7 +36,7 @@ public:
     ~FacebookImagesPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class FacebookImagesPluginLoader : public Buteo::SyncPluginLoader
