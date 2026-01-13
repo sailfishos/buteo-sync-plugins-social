@@ -130,7 +130,9 @@ private:
                                       const QString &ownerEmail);
 
     const QList<QDateTime> getExceptionInstanceDates(const KCalendarCore::Event::Ptr event) const;
-    QJsonObject kCalToJson(KCalendarCore::Event::Ptr event, KCalendarCore::ICalFormat &icalFormat, bool setUidProperty = false) const;
+    QJsonObject kCalToJson(KCalendarCore::Event::Ptr event,
+                           KCalendarCore::ICalFormat &icalFormat,
+                           bool setUidProperty = false) const;
 
     void handleErrorReply(QNetworkReply *reply);
     void handleDeleteReply(QNetworkReply *reply);

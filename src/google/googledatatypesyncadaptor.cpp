@@ -28,7 +28,7 @@
 #include <QtCore/QString>
 #include <QtCore/QByteArray>
 
-//libsailfishkeyprovider
+// libsailfishkeyprovider
 #include <sailfishkeyprovider.h>
 
 // libaccounts-qt5
@@ -37,13 +37,14 @@
 #include <Accounts/Service>
 #include <Accounts/AccountService>
 
-//libsignon-qt: SignOn::NoUserInteractionPolicy
+// libsignon-qt: SignOn::NoUserInteractionPolicy
 #include <SignOn/Identity>
 #include <SignOn/AuthSession>
 #include <SignOn/SessionData>
 
 GoogleDataTypeSyncAdaptor::GoogleDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
-    : SocialNetworkSyncAdaptor("google", dataType, 0, parent), m_triedLoading(false)
+    : SocialNetworkSyncAdaptor("google", dataType, nullptr, parent)
+    , m_triedLoading(false)
 {
 }
 

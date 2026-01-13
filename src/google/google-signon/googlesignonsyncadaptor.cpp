@@ -272,7 +272,7 @@ void GoogleSignonSyncAdaptor::refreshTokenResponse(const SignOn::SessionData &re
     }
 
     qCInfo(lcSocialPlugin)
-            << QString(QLatin1String("successfully performed signon refresh for Google account %1: new ExpiresIn: %3"))
+            << QString::fromLatin1("successfully performed signon refresh for Google account %1: new ExpiresIn: %3")
                .arg(accountId).arg(responseData.getProperty("ExpiresIn").toInt());
 
     lowerCredentialsNeedUpdateFlag(accountId);
@@ -295,7 +295,7 @@ void GoogleSignonSyncAdaptor::signonError(const SignOn::Error &error)
 
     bool raiseFlag = error.type() == SignOn::Error::UserInteraction;
     qCInfo(lcSocialPlugin)
-            << QString(QLatin1String("got signon error when performing signon refresh for Google account %1: %2: %3.  Raising flag? %4"))
+            << QString::fromLatin1("got signon error when performing signon refresh for Google account %1: %2: %3.  Raising flag? %4")
                .arg(accountId).arg(error.type()).arg(error.message()).arg(raiseFlag);
 
     if (raiseFlag) {
