@@ -348,7 +348,7 @@ void SocialNetworkSyncAdaptor::setupReplyTimeout(int accountId, QNetworkReply *r
     timer->setInterval(msecs);
     timer->setProperty("accountId", accountId);
     timer->setProperty("networkReply", QVariant::fromValue<QNetworkReply*>(reply));
-    connect(timer, SIGNAL(timeout()), this, SLOT(timeoutReply()));
+    connect(timer, &QTimer::timeout, this, &SocialNetworkSyncAdaptor::timeoutReply);
     timer->start();
     m_networkReplyTimeouts[accountId].insert(reply, timer);
 }

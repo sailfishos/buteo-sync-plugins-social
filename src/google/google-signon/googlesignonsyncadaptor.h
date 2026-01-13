@@ -45,7 +45,7 @@ class GoogleSignonSyncAdaptor : public GoogleDataTypeSyncAdaptor
     Q_OBJECT
 
 public:
-    GoogleSignonSyncAdaptor(QObject *parent);
+    explicit GoogleSignonSyncAdaptor(QObject *parent);
     ~GoogleSignonSyncAdaptor();
 
     QString syncServiceName() const override;

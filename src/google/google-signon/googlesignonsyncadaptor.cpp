@@ -69,7 +69,7 @@ void GoogleSignonSyncAdaptor::beginSync(int accountId, const QString &accessToke
 
 Accounts::Account *GoogleSignonSyncAdaptor::loadAccount(int accountId)
 {
-    Accounts::Account *acc = 0;
+    Accounts::Account *acc = nullptr;
     if (m_accounts.contains(accountId)) {
         acc = m_accounts[accountId];
     } else {
@@ -78,7 +78,7 @@ Accounts::Account *GoogleSignonSyncAdaptor::loadAccount(int accountId)
             qCWarning(lcSocialPlugin)
                     << QString(QLatin1String("error: Google account %1 was deleted during signon refresh sync"))
                        .arg(accountId);
-            return 0;
+            return nullptr;
         } else {
             m_accounts.insert(accountId, acc);
         }
@@ -89,7 +89,7 @@ Accounts::Account *GoogleSignonSyncAdaptor::loadAccount(int accountId)
         qCWarning(lcSocialPlugin)
                 << QString(QLatin1String("error: invalid service %1 specified for refresh sync with Google account: %2"))
                    .arg(syncServiceName()).arg(accountId);
-        return 0;
+        return nullptr;
     }
 
     return acc;
@@ -134,7 +134,8 @@ void GoogleSignonSyncAdaptor::refreshTokens(int accountId)
     // First perform a "normal" signon.  Then force token expiry.  Then signon to refresh the tokens.
     Accounts::Service srv(m_accountManager.service(syncServiceName()));
     acc->selectService(srv);
-    SignOn::Identity *identity = acc->credentialsId() > 0 ? SignOn::Identity::existingIdentity(acc->credentialsId()) : 0;
+    SignOn::Identity *identity = acc->credentialsId() > 0 ? SignOn::Identity::existingIdentity(acc->credentialsId())
+                                                          : nullptr;
     if (!identity) {
         qCWarning(lcSocialPlugin)
                 << QString(QLatin1String("error: Google account %1 has no valid credentials, cannot perform refresh sync"))
@@ -168,11 +169,11 @@ void GoogleSignonSyncAdaptor::refreshTokens(int accountId)
     signonSessionData.insert("ClientSecret", clientSecret());
     signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(initialSignonResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &GoogleSignonSyncAdaptor::initialSignonResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signonError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &GoogleSignonSyncAdaptor::signonError,
             Qt::UniqueConnection);
 
     incrementSemaphore(accountId);
@@ -198,11 +199,11 @@ void GoogleSignonSyncAdaptor::initialSignonResponse(const SignOn::SessionData &r
         return;
     }
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(forceTokenExpiryResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &GoogleSignonSyncAdaptor::forceTokenExpiryResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signonError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &GoogleSignonSyncAdaptor::signonError,
             Qt::UniqueConnection);
 
     QString mechanism = session->property("mechanism").toString();
@@ -232,7 +233,8 @@ void GoogleSignonSyncAdaptor::forceTokenExpiryResponse(const SignOn::SessionData
     timer->setProperty("mechanism", mechanism);
     timer->setProperty("signonSessionData", signonSessionData);
     timer->setProperty("session", QVariant::fromValue<SignOn::AuthSession*>(session));
-    connect(timer, SIGNAL(timeout()), this, SLOT(triggerRefresh()));
+
+    connect(timer, &QTimer::timeout, this, &GoogleSignonSyncAdaptor::triggerRefresh);
     timer->start();
 }
 
@@ -245,11 +247,11 @@ void GoogleSignonSyncAdaptor::triggerRefresh()
     QVariantMap signonSessionData = timer->property("signonSessionData").toMap();
 
     SignOn::AuthSession *session = timer->property("session").value<SignOn::AuthSession*>();
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(refreshTokenResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &GoogleSignonSyncAdaptor::refreshTokenResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signonError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &GoogleSignonSyncAdaptor::signonError,
             Qt::UniqueConnection);
 
     session->process(SignOn::SessionData(signonSessionData), mechanism);
@@ -303,4 +305,3 @@ void GoogleSignonSyncAdaptor::signonError(const SignOn::Error &error)
 
     decrementSemaphore(accountId);
 }
-

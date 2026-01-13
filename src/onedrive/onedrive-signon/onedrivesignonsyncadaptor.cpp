@@ -230,7 +230,7 @@ void OneDriveSignonSyncAdaptor::forceTokenExpiryResponse(const SignOn::SessionDa
     timer->setProperty("mechanism", mechanism);
     timer->setProperty("signonSessionData", signonSessionData);
     timer->setProperty("session", QVariant::fromValue<SignOn::AuthSession*>(session));
-    connect(timer, SIGNAL(timeout()), this, SLOT(triggerRefresh()));
+    connect(timer, &QTimer::timeout, this, &OneDriveSignonSyncAdaptor::triggerRefresh);
     timer->start();
 }
 
