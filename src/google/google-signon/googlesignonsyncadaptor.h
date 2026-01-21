@@ -62,12 +62,15 @@ private Q_SLOTS:
     void refreshTokenResponse(const SignOn::SessionData &responseData);
     void signonError(const SignOn::Error &error);
     void triggerRefresh();
+    void emailAliasFinishedHandler();
 
 private:
     Accounts::Account *loadAccount(int accountId);
     void raiseCredentialsNeedUpdateFlag(int accountId);
     void lowerCredentialsNeedUpdateFlag(int accountId);
     void refreshTokens(int accountId);
+    void refreshEmailAlias(const QString &accessToken, int accountId);
+    void setEmailAliases(const QStringList &aliases, int accountId);
 
     Accounts::Manager m_accountManager;
     QMap<int, Accounts::Account *> m_accounts;

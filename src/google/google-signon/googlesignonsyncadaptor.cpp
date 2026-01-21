@@ -188,12 +188,12 @@ void GoogleSignonSyncAdaptor::initialSignonResponse(const SignOn::SessionData &r
 {
     SignOn::AuthSession *session = qobject_cast<SignOn::AuthSession*>(sender());
     session->disconnect(this);
+    int accountId = session->property("accountId").toInt();
 
     if (syncAborted()) {
         // don't expire the tokens - we may have lost network connectivity
         // while we were attempting to perform signon sync, and that would
         // leave us in a position where we're unable to automatically recover.
-        int accountId = session->property("accountId").toInt();
         qCInfo(lcSocialPlugin) << "aborting signon sync refresh";
         decrementSemaphore(accountId);
         return;
@@ -215,6 +215,9 @@ void GoogleSignonSyncAdaptor::initialSignonResponse(const SignOn::SessionData &r
     providedTokens.insert("RefreshToken", responseData.getProperty(QStringLiteral("RefreshToken")).toString());
     providedTokens.insert("ExpiresIn", 2);
     signonSessionData.insert("ProvidedTokens", providedTokens);
+
+    // update the aliases too with the new token
+    refreshEmailAlias(providedTokens.value("AccessToken").toString(), accountId);
 
     session->process(SignOn::SessionData(signonSessionData), mechanism);
 }
@@ -304,4 +307,87 @@ void GoogleSignonSyncAdaptor::signonError(const SignOn::Error &error)
     }
 
     decrementSemaphore(accountId);
+}
+
+void GoogleSignonSyncAdaptor::refreshEmailAlias(const QString &accessToken, int accountId)
+{
+    QUrl url(QLatin1String("https://gmail.googleapis.com/gmail/v1/users/me/settings/sendAs"));
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization",
+                         QByteArray("Bearer ") + accessToken.toUtf8());
+
+    QNetworkReply *reply = m_networkAccessManager->get(request);
+
+    if (reply) {
+        reply->setProperty("accountId", accountId);
+        reply->setProperty("accessToken", accessToken);
+
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, &QNetworkReply::sslErrors,
+                this, &GoogleSignonSyncAdaptor::sslErrorsHandler);
+        connect(reply, &QNetworkReply::finished, this, &GoogleSignonSyncAdaptor::emailAliasFinishedHandler);
+
+        setupReplyTimeout(accountId, reply);
+
+        // we're requesting data.  Increment the semaphore so that we know we're still busy.
+        incrementSemaphore(accountId);
+    } else {
+        qCWarning(lcSocialPlugin) << "unable to request email alias from Google account with id"; //<< m_accountId;
+    }
+}
+
+void GoogleSignonSyncAdaptor::emailAliasFinishedHandler()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    reply->deleteLater();
+
+    bool isError = reply->property("isError").toBool();
+    int accountId = reply->property("accountId").toInt();
+
+    if (isError) {
+        decrementSemaphore(accountId);
+        return;
+    }
+
+    QByteArray replyData = reply->readAll();
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(replyData, &error);
+
+    if (error.error == QJsonParseError::NoError) {
+        QJsonArray sendAsList = doc.object().value(QStringLiteral("sendAs")).toArray();
+        QStringList result;
+
+        for (int i = 0; i < sendAsList.count(); ++i) {
+            QJsonObject entry = sendAsList.at(i).toObject();
+
+            bool isPrimary = entry.value(QStringLiteral("isPrimary")).toBool();
+            if (!isPrimary) {
+                QString address = entry.value(QStringLiteral("sendAsEmail")).toString();
+                result.append(address);
+            }
+        }
+
+        setEmailAliases(result, accountId);
+    } else {
+        qCDebug(lcSocialPlugin) << "Json parse error:" << error.errorString();
+    }
+
+    decrementSemaphore(accountId);
+}
+
+void GoogleSignonSyncAdaptor::setEmailAliases(const QStringList &aliases, int accountId)
+{
+    qCDebug(lcSocialPlugin) << "Setting email alias list on account" << accountId << "to" << aliases;
+
+    Accounts::Account *acc = loadAccount(accountId);
+    if (!acc) {
+        return;
+    }
+
+    Accounts::Service srv = m_accountManager.service(QStringLiteral("google-gmail"));
+    acc->selectService(srv);
+    acc->setValue(QStringLiteral("emailAliases"), QVariant(aliases));
+    acc->selectService(Accounts::Service());
+    acc->syncAndBlock();
 }
