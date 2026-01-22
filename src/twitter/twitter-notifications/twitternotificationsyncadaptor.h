@@ -35,6 +35,7 @@
 #include <socialcache/twitternotificationsdatabase.h>
 
 class Notification;
+
 class TwitterNotificationSyncAdaptor : public TwitterDataTypeSyncAdaptor
 {
     Q_OBJECT
@@ -43,12 +44,12 @@ public:
     TwitterNotificationSyncAdaptor(QObject *parent);
     ~TwitterNotificationSyncAdaptor();
 
-    QString syncServiceName() const;
+    QString syncServiceName() const override;
 
 protected: // implementing TwitterDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &oauthToken, const QString &oauthTokenSecret);
-    void finalize(int accountId);
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &oauthToken, const QString &oauthTokenSecret) override;
+    void finalize(int accountId) override;
 
 private:
     void requestNotifications(int accountId, const QString &oauthToken,

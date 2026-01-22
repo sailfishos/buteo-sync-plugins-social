@@ -36,7 +36,7 @@ public:
     ~FacebookCalendarsPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class FacebookCalendarsPluginLoader : public Buteo::SyncPluginLoader

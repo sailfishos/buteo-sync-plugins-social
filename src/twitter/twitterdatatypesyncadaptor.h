@@ -49,15 +49,19 @@ class TwitterDataTypeSyncAdaptor : public SocialNetworkSyncAdaptor
 public:
     TwitterDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     virtual ~TwitterDataTypeSyncAdaptor();
-    virtual void sync(const QString &dataTypeString, int accountId);
+
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected:
     static QDateTime parseTwitterDateTime(const QString &tdt);
-    virtual QString authorizationHeader(int accountId, const QString &oauthToken, const QString &oauthTokenSecret, const QString &requestMethod, const QString &requestUrl, const QList<QPair<QString, QString> > &parameters);
+    virtual QString authorizationHeader(int accountId, const QString &oauthToken, const QString &oauthTokenSecret,
+                                        const QString &requestMethod, const QString &requestUrl,
+                                        const QList<QPair<QString, QString> > &parameters);
     virtual void updateDataForAccount(int accountId);
     virtual void beginSync(int accountId, const QString &oauthToken, const QString &oauthTokenSecret) = 0;
     QString consumerKey();
     QString consumerSecret();
+
 protected Q_SLOTS:
     virtual void errorHandler(QNetworkReply::NetworkError err);
     virtual void sslErrorsHandler(const QList<QSslError> &errs);

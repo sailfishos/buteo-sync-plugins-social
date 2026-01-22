@@ -50,7 +50,8 @@ class FacebookDataTypeSyncAdaptor : public SocialNetworkSyncAdaptor
 public:
     FacebookDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent);
     virtual ~FacebookDataTypeSyncAdaptor();
-    virtual void sync(const QString &dataTypeString, int accountId);
+
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected:
     QString clientId();

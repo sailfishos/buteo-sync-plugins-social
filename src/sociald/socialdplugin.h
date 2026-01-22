@@ -58,18 +58,19 @@ public:
                   Buteo::PluginCbInterface *cbInterface);
     ~SocialdPlugin();
 
-    bool init();
-    bool uninit();
-    bool startSync();
-    void abortSync(Sync::SyncStatus status = Sync::SYNC_ABORTED);
-    Buteo::SyncResults getSyncResults() const;
-    bool cleanUp();
+    bool init() override;
+    bool uninit() override;
+    bool startSync() override;
+    void abortSync(Sync::SyncStatus status = Sync::SYNC_ABORTED) override;
+    Buteo::SyncResults getSyncResults() const override;
+    bool cleanUp() override;
 
 public slots:
-    void connectivityStateChanged(Sync::ConnectivityType type, bool state);
+    void connectivityStateChanged(Sync::ConnectivityType type, bool state) override;
 
 private:
     void updateResults(const Buteo::SyncResults &results);
+
     Buteo::SyncResults m_syncResults;
     QString m_dataType;
     QString m_serviceName;

@@ -45,16 +45,16 @@ class GoogleSignonSyncAdaptor : public GoogleDataTypeSyncAdaptor
     Q_OBJECT
 
 public:
-    GoogleSignonSyncAdaptor(QObject *parent);
+    explicit GoogleSignonSyncAdaptor(QObject *parent);
     ~GoogleSignonSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId = 0);
+    QString syncServiceName() const override;
+    void sync(const QString &dataTypeString, int accountId = 0) override;
 
 protected: // implementing GoogleDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalize(int accountId) override;
 
 private Q_SLOTS:
     void initialSignonResponse(const SignOn::SessionData &responseData);
@@ -62,12 +62,15 @@ private Q_SLOTS:
     void refreshTokenResponse(const SignOn::SessionData &responseData);
     void signonError(const SignOn::Error &error);
     void triggerRefresh();
+    void emailAliasFinishedHandler();
 
 private:
     Accounts::Account *loadAccount(int accountId);
     void raiseCredentialsNeedUpdateFlag(int accountId);
     void lowerCredentialsNeedUpdateFlag(int accountId);
     void refreshTokens(int accountId);
+    void refreshEmailAlias(const QString &accessToken, int accountId);
+    void setEmailAliases(const QStringList &aliases, int accountId);
 
     Accounts::Manager m_accountManager;
     QMap<int, Accounts::Account *> m_accounts;

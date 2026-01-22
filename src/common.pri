@@ -1,5 +1,5 @@
-QMAKE_CXXFLAGS += -Werror
 CONFIG += link_pkgconfig
+
 PKGCONFIG += \
     libsailfishkeyprovider \
     libsignon-qt5 \
@@ -12,9 +12,9 @@ QT += \
     dbus \
     sql
 
-QT -= \
-    gui
+QT -= gui
 
+QMAKE_CXXFLAGS += -Wsuggest-override
 QMAKE_LFLAGS += $$QMAKE_LFLAGS_NOUNDEF
 
 DEFINES += 'SYNC_DATABASE_DIR=\'\"Sync\"\''

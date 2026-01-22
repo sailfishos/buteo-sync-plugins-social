@@ -207,8 +207,8 @@ void OneDriveImageSyncAdaptor::requestResource(int accountId, const QString &acc
                                                         : resourceTarget));
     qCDebug(lcSocialPlugin) << "OneDrive image sync requesting resource:" << url.toString();
     QNetworkRequest req(url);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
     QNetworkReply *reply = m_networkAccessManager->get(req);
     if (reply) {
         reply->setProperty("accountId", accountId);
@@ -232,8 +232,8 @@ void OneDriveImageSyncAdaptor::requestNextLink(int accountId, const QString &acc
     qCDebug(lcSocialPlugin) << "OneDrive image sync requesting nextlink resources:" << nextLink;
     QUrl nextLinkUrl(nextLink);
     QNetworkRequest req(nextLinkUrl);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
     QNetworkReply *reply = m_networkAccessManager->get(req);
     if (reply) {
         reply->setProperty("accountId", accountId);

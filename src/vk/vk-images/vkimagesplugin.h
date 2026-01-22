@@ -37,7 +37,7 @@ public:
     ~VKImagesPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class VKImagesPluginLoader : public Buteo::SyncPluginLoader

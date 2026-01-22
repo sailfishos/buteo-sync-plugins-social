@@ -273,8 +273,8 @@ void OneDriveBackupOperationSyncAdaptor::beginListOperation(int accountId, const
     url.setQuery(query);
 
     QNetworkRequest req(url);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
     QNetworkReply *reply = m_networkAccessManager->get(req);
     if (reply) {
         reply->setProperty("accountId", accountId);
@@ -413,8 +413,8 @@ void OneDriveBackupOperationSyncAdaptor::initialiseAppFolderRequest(int accountI
     QUrl url = QUrl(QStringLiteral("%1/%2").arg(api(), QStringLiteral("drive/special/approot")));
 
     QNetworkRequest req(url);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     QNetworkReply *reply = m_networkAccessManager->get(req);
 
@@ -520,8 +520,8 @@ void OneDriveBackupOperationSyncAdaptor::getRemoteFolderMetadata(int accountId,
     url.setQuery(query);
 
     QNetworkRequest req(url);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     QNetworkReply *reply = m_networkAccessManager->get(req);
 
@@ -660,8 +660,8 @@ void OneDriveBackupOperationSyncAdaptor::requestData(int accountId, const QStrin
     }
 
     QNetworkRequest req(url);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     QNetworkReply *reply = m_networkAccessManager->get(req);
 
@@ -837,8 +837,8 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         request.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
         request.setHeader(QNetworkRequest::ContentTypeHeader,
                           QVariant::fromValue<QString>(QString::fromLatin1("application/json")));
-        request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                             QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+        request.setRawHeader("Authorization",
+                             QByteArray("Bearer ") + accessToken.toUtf8());
         qCDebug(lcSocialPlugin) << "Attempting to create the remote directory:" << intermediatePath << "via request:" << url.toString();
         qCDebug(lcSocialPlugin) << "with data:" << createFolderJson;
 
@@ -857,8 +857,8 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         request.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
         request.setHeader(QNetworkRequest::ContentTypeHeader,
                           QVariant::fromValue<QString>(QString::fromLatin1("application/json")));
-        request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                         QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+        request.setRawHeader("Authorization",
+                             QByteArray("Bearer ") + accessToken.toUtf8());
         qCDebug(lcSocialPlugin) << "Creating upload session for remote file:"
                           << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
                           << "via request:" << url.toString();

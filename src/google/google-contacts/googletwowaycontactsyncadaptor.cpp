@@ -352,8 +352,8 @@ void GoogleTwoWayContactSyncAdaptor::requestData(
     requestUrl.setQuery(urlQuery);
 
     QNetworkRequest req(requestUrl);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ") + m_accessToken).toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + m_accessToken.toUtf8());
 
     qCDebug(lcSocialPluginTrace) << "requesting" << requestUrl << "with account" << m_accountId;
 
@@ -782,12 +782,12 @@ void GoogleTwoWayContactSyncAdaptor::storeToRemote(const QByteArray &encodedCont
 {
     QUrl requestUrl(QLatin1String("https://people.googleapis.com/batch"));
     QNetworkRequest req(requestUrl);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + m_accessToken.toUtf8());
+    req.setRawHeader("Authorization",
                      QString(QLatin1String("Bearer ") + m_accessToken).toUtf8());
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ") + m_accessToken).toUtf8());
-    req.setRawHeader(QString(QLatin1String("Content-Type")).toUtf8(),
-                     QString(QLatin1String("multipart/mixed; boundary=\"batch_people\"")).toUtf8());
+    req.setRawHeader("Content-Type",
+                     QByteArray("multipart/mixed; boundary=\"batch_people\""));
     req.setHeader(QNetworkRequest::ContentLengthHeader, encodedContactUpdates.size());
 
     // we're posting data.  Increment the semaphore so that we know we're still busy.

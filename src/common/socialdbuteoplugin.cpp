@@ -116,7 +116,7 @@ SocialdButeoPlugin::SocialdButeoPlugin(const QString& pluginName,
                                        const QString &socialServiceName,
                                        const QString &dataTypeName)
     : ClientPlugin(pluginName, profile, callbackInterface)
-    , m_socialNetworkSyncAdaptor(0)
+    , m_socialNetworkSyncAdaptor(nullptr)
     , m_socialServiceName(socialServiceName)
     , m_dataTypeName(dataTypeName)
     , m_profileAccountId(0)
@@ -132,7 +132,8 @@ bool SocialdButeoPlugin::init()
     m_profileAccountId = profile().key(Buteo::KEY_ACCOUNT_ID).toInt();
     m_socialNetworkSyncAdaptor = createSocialNetworkSyncAdaptor();
     if (m_socialNetworkSyncAdaptor) {
-        connect(m_socialNetworkSyncAdaptor, SIGNAL(statusChanged()), this, SLOT(syncStatusChanged()));
+        connect(m_socialNetworkSyncAdaptor, &SocialNetworkSyncAdaptor::statusChanged,
+                this, &SocialdButeoPlugin::syncStatusChanged);
         return true;
     }
 
@@ -142,7 +143,7 @@ bool SocialdButeoPlugin::init()
 bool SocialdButeoPlugin::uninit()
 {
     delete m_socialNetworkSyncAdaptor;
-    m_socialNetworkSyncAdaptor = 0;
+    m_socialNetworkSyncAdaptor = nullptr;
     return true;
 }
 

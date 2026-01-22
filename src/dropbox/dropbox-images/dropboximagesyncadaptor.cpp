@@ -150,8 +150,8 @@ void DropboxImageSyncAdaptor::queryCameraRollCursor(int accountId, const QString
     req.setUrl(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     req.setHeader(QNetworkRequest::ContentLengthHeader, postData.size());
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     qCDebug(lcSocialPlugin) << "querying camera roll cursor:" << url.toString();
 
@@ -244,8 +244,8 @@ void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &acce
     req.setUrl(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     req.setHeader(QNetworkRequest::ContentLengthHeader, postData.size());
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     qCDebug(lcSocialPlugin) << "querying camera roll:" << url.toString();
 
@@ -421,8 +421,8 @@ void DropboxImageSyncAdaptor::possiblyAddNewUser(const QString &userId, int acco
     QUrl url(QStringLiteral("%1/2/users/get_current_account").arg(api()));
     QNetworkRequest req;
     req.setUrl(url);
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     qCDebug(lcSocialPlugin) << "querying Dropbox account info:" << url.toString();
 

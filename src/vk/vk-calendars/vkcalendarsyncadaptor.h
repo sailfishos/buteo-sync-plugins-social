@@ -24,15 +24,15 @@ public:
     VKCalendarSyncAdaptor(QObject *parent);
     ~VKCalendarSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId = 0);
+    QString syncServiceName() const override;
+    void sync(const QString &dataTypeString, int accountId = 0) override;
 
 protected: // implementing VKDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalize(int accountId);
-    void finalCleanup();
-    void retryThrottledRequest(const QString &request, const QVariantList &args, bool retryLimitReached);
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalize(int accountId) override;
+    void finalCleanup() override;
+    void retryThrottledRequest(const QString &request, const QVariantList &args, bool retryLimitReached) override;
 
 private:
     void requestEvents(int accountId, const QString &accessToken, int offset = 0);

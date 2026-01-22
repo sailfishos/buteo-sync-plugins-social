@@ -28,7 +28,7 @@
 #include <QtCore/QString>
 #include <QtCore/QByteArray>
 
-//libsailfishkeyprovider
+// libsailfishkeyprovider
 #include <sailfishkeyprovider.h>
 
 // libaccounts-qt5
@@ -37,13 +37,14 @@
 #include <Accounts/Service>
 #include <Accounts/AccountService>
 
-//libsignon-qt: SignOn::NoUserInteractionPolicy
+// libsignon-qt: SignOn::NoUserInteractionPolicy
 #include <SignOn/Identity>
 #include <SignOn/AuthSession>
 #include <SignOn/SessionData>
 
 GoogleDataTypeSyncAdaptor::GoogleDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
-    : SocialNetworkSyncAdaptor("google", dataType, 0, parent), m_triedLoading(false)
+    : SocialNetworkSyncAdaptor("google", dataType, nullptr, parent)
+    , m_triedLoading(false)
 {
 }
 
@@ -225,7 +226,9 @@ void GoogleDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     // grab out a valid identity for the sync service.
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
-    SignOn::Identity *identity = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
+    SignOn::Identity *identity = account->credentialsId() > 0
+            ? SignOn::Identity::existingIdentity(account->credentialsId())
+            : nullptr;
     if (!identity) {
         qCWarning(lcSocialPlugin) << "account" << accountId << "has no valid credentials; cannot sign in";
         decrementSemaphore(accountId);
@@ -248,11 +251,11 @@ void GoogleDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     signonSessionData.insert("ClientSecret", clientSecret());
     signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(signOnResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &GoogleDataTypeSyncAdaptor::signOnResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signOnError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &GoogleDataTypeSyncAdaptor::signOnError,
             Qt::UniqueConnection);
 
     session->setProperty("account", QVariant::fromValue<Accounts::Account*>(account));

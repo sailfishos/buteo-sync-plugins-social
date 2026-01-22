@@ -37,7 +37,7 @@ public:
     ~OneDriveBackupQueryPlugin();
 
 protected:
-    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor();
+    SocialNetworkSyncAdaptor *createSocialNetworkSyncAdaptor() override;
 };
 
 class OneDriveBackupQueryPluginLoader : public Buteo::SyncPluginLoader

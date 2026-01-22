@@ -41,13 +41,13 @@ public:
     GoogleCalendarSyncAdaptor(QObject *parent);
     ~GoogleCalendarSyncAdaptor();
 
-    QString syncServiceName() const;
-    void sync(const QString &dataTypeString, int accountId);
+    QString syncServiceName() const override;
+    void sync(const QString &dataTypeString, int accountId) override;
 
 protected: // implementing GoogleDataTypeSyncAdaptor interface
-    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode);
-    void beginSync(int accountId, const QString &accessToken);
-    void finalCleanup();
+    void purgeDataForOldAccount(int oldId, SocialNetworkSyncAdaptor::PurgeMode mode) override;
+    void beginSync(int accountId, const QString &accessToken) override;
+    void finalCleanup() override;
 
 private:
     enum ChangeType {
@@ -130,7 +130,9 @@ private:
                                       const QString &ownerEmail);
 
     const QList<QDateTime> getExceptionInstanceDates(const KCalendarCore::Event::Ptr event) const;
-    QJsonObject kCalToJson(KCalendarCore::Event::Ptr event, KCalendarCore::ICalFormat &icalFormat, bool setUidProperty = false) const;
+    QJsonObject kCalToJson(KCalendarCore::Event::Ptr event,
+                           KCalendarCore::ICalFormat &icalFormat,
+                           bool setUidProperty = false) const;
 
     void handleErrorReply(QNetworkReply *reply);
     void handleDeleteReply(QNetworkReply *reply);

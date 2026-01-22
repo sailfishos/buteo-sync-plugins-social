@@ -17,17 +17,21 @@
 #include <QUrl>
 
 class QNetworkReply;
+
 class VKContactImageDownloader: public AbstractImageDownloader
 {
     Q_OBJECT
 
 public:
-    explicit VKContactImageDownloader();
+    VKContactImageDownloader();
+
     static QString staticOutputFile(const QString &identifier, const QUrl &url);
+
 protected:
-    QNetworkReply * createReply(const QString &url, const QVariantMap &metadata);
+    QNetworkReply * createReply(const QString &url, const QVariantMap &metadata) override;
     // This is a reimplemented method, used by AbstractImageDownloader
     QString outputFile(const QString &url, const QVariantMap &data, const QString &mimeType) const override;
+
 private:
     Q_DECLARE_PRIVATE(AbstractImageDownloader)
 };
