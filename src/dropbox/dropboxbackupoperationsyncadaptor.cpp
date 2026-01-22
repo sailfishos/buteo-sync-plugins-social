@@ -275,8 +275,8 @@ void DropboxBackupOperationSyncAdaptor::requestList(int accountId,
     req.setUrl(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     req.setHeader(QNetworkRequest::ContentLengthHeader, postData.size());
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     qCDebug(lcSocialPlugin) << "performing directory request:" << url.toString() << ":" << remotePath << continuationCursor;
 
@@ -445,8 +445,8 @@ void DropboxBackupOperationSyncAdaptor::requestData(int accountId,
     QNetworkRequest req;
     req.setUrl(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-    req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                     QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+    req.setRawHeader("Authorization",
+                     QByteArray("Bearer ") + accessToken.toUtf8());
 
     qCDebug(lcSocialPlugin) << "performing file download request:" << url.toString() << ":" << remoteFile;
 
@@ -546,8 +546,8 @@ void DropboxBackupOperationSyncAdaptor::uploadData(int accountId, const QString 
         req.setUrl(url);
         req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         req.setHeader(QNetworkRequest::ContentLengthHeader, postData.size());
-        req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                         QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
+        req.setRawHeader("Authorization",
+                         QByteArray("Bearer ") + accessToken.toUtf8());
 
         qCDebug(lcSocialPlugin) << "Attempting to create the remote directory:" << remotePath
                                 << "via request:" << url.toString();
@@ -571,22 +571,20 @@ void DropboxBackupOperationSyncAdaptor::uploadData(int accountId, const QString 
 
         QString localFileName = QStringLiteral("%1/%2").arg(localPath).arg(localFile);
         QFile f(localFileName, this);
-         if(!f.open(QIODevice::ReadOnly)){
-             qCWarning(lcSocialPlugin) << "unable to open local file:" << localFileName
-                                       << "for upload to Dropbox Backup with account:" << accountId;
-         } else {
-             QByteArray data(f.readAll());
-             f.close();
-             QNetworkRequest req(url);
-             req.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                              QString(QLatin1String("Bearer ")).toUtf8() + accessToken.toUtf8());
-             req.setRawHeader(QString(QLatin1String("Dropbox-API-Arg")).toUtf8(),
-                              requestParamData);
-             req.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
-             req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-             qCDebug(lcSocialPlugin) << "Attempting to create the remote file:" << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
-                                     << "via request:" << url.toString();
-             reply = m_networkAccessManager->post(req, data);
+        if (!f.open(QIODevice::ReadOnly)){
+            qCWarning(lcSocialPlugin) << "unable to open local file:" << localFileName
+                                      << "for upload to Dropbox Backup with account:" << accountId;
+        } else {
+            QByteArray data(f.readAll());
+            f.close();
+            QNetworkRequest req(url);
+            req.setRawHeader("Authorization", QByteArray("Bearer ") + accessToken.toUtf8());
+            req.setRawHeader("Dropbox-API-Arg", requestParamData);
+            req.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
+            req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
+            qCDebug(lcSocialPlugin) << "Attempting to create the remote file:" << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
+                                    << "via request:" << url.toString();
+            reply = m_networkAccessManager->post(req, data);
         }
     }
 

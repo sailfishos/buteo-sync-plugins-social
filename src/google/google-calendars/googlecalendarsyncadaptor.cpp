@@ -1199,8 +1199,8 @@ void GoogleCalendarSyncAdaptor::requestCalendars(const QString &accessToken, boo
 
     QNetworkRequest request(url);
     request.setRawHeader("GData-Version", "3.0");
-    request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
-                         QString(QLatin1String("Bearer ") + accessToken).toUtf8());
+    request.setRawHeader("Authorization",
+                         QByteArray("Bearer ") + accessToken.toUtf8());
 
     QNetworkReply *reply = m_networkAccessManager->get(request);
 
@@ -1454,7 +1454,7 @@ void GoogleCalendarSyncAdaptor::requestEvents(const QString &accessToken, const 
 
     QNetworkRequest request(url);
     request.setRawHeader("GData-Version", "3.0");
-    request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
+    request.setRawHeader("Authorization",
                          QString(QLatin1String("Bearer ") + accessToken).toUtf8());
 
     QNetworkReply *reply = m_networkAccessManager->get(request);
@@ -2218,7 +2218,7 @@ void GoogleCalendarSyncAdaptor::upsyncChanges(const UpsyncChange &changeToUpsync
 
     QNetworkRequest request(requestUrl);
     request.setRawHeader("GData-Version", "3.0");
-    request.setRawHeader(QString(QLatin1String("Authorization")).toUtf8(),
+    request.setRawHeader("Authorization",
                          QString(QLatin1String("Bearer ") + accessToken).toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader,
                       QVariant::fromValue<QString>(QString::fromLatin1("application/json")));
