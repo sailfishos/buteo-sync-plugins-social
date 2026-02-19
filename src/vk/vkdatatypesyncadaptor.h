@@ -12,6 +12,7 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QString>
+#include <QtCore/QTimer>
 #include <QtCore/QVariantList>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QSslError>

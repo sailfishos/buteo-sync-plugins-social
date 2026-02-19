@@ -12,6 +12,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QJsonArray>
+#include <QtCore/QUuid>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
 

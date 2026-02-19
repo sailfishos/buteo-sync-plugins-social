@@ -8,6 +8,7 @@
 #include "vkpostsyncadaptor.h"
 #include "trace.h"
 #include "constants_p.h"
+#include "buteosyncfw_p.h"
 
 #include <QtCore/QPair>
 #include <QtCore/QJsonArray>

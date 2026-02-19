@@ -1,0 +1,12 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/buteosocialcommon
+
+Name: buteosocialcommon
+Description: Common support library for social sync plugins
+Version: 0.4.0
+Requires: accounts-qt5 buteosyncfw5 socialcache
+Requires.private: Qt5Network Qt5DBus
+Libs: -L${libdir} -lbuteosocialcommon
+Cflags: -I${includedir}
