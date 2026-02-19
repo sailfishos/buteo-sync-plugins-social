@@ -3,17 +3,25 @@ TEMPLATE = lib
 QT -= gui
 QT += network dbus
 
+isEmpty(PREFIX) {
+    PREFIX=/usr
+}
+
 CONFIG += link_pkgconfig
 PKGCONFIG += \
     accounts-qt5 \
     buteosyncfw5 \
     socialcache \
 
-TARGET = syncpluginscommon
+# qmake's pkg-config generation relies on prl generation internals.
+CONFIG += create_pc create_prl no_install_prl
+
+TARGET = buteosocialcommon
 TARGET = $$qtLibraryTarget($$TARGET)
 
 HEADERS += \
     $$PWD/buteosyncfw_p.h \
+    $$PWD/constants_p.h \
     $$PWD/socialdbuteoplugin.h \
     $$PWD/socialnetworksyncadaptor.h \
     $$PWD/socialdnetworkaccessmanager_p.h \
@@ -27,5 +35,19 @@ SOURCES += \
 
 TARGETPATH = $$[QT_INSTALL_LIBS]
 target.path = $$TARGETPATH
+common_headers.path = $$PREFIX/include/buteosocialcommon
+common_headers.files = \
+    $$PWD/socialdbuteoplugin.h \
+    $$PWD/socialnetworksyncadaptor.h
+INSTALLS += target common_headers
 
-INSTALLS += target
+QMAKE_PKGCONFIG_DESTDIR = pkgconfig
+QMAKE_PKGCONFIG_PREFIX = $$PREFIX
+QMAKE_PKGCONFIG_LIBDIR = $$target.path
+QMAKE_PKGCONFIG_INCDIR = $$common_headers.path
+QMAKE_PKGCONFIG_NAME = buteosocialcommon
+QMAKE_PKGCONFIG_FILE = buteosocialcommon
+QMAKE_PKGCONFIG_DESCRIPTION = Common support library for social sync plugins
+QMAKE_PKGCONFIG_REQUIRES = buteosyncfw5
+QMAKE_PKGCONFIG_VERSION = 1.0.0
+pkgconfig.files = $${QMAKE_PKGCONFIG_FILE}.pc

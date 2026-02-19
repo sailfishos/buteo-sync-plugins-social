@@ -23,7 +23,14 @@
 #define SOCIALDBUTEOPLUGIN_H
 
 #include <QtCore/qglobal.h>
-#include "buteosyncfw_p.h"
+
+// Buteo
+#include <ClientPlugin.h>
+#include <ProfileManager.h>
+#include <PluginCbInterface.h>
+#include <SyncCommonDefs.h>
+#include <SyncProfile.h>
+#include <SyncResults.h>
 
 /*
    Datatype-specific implementations of this class

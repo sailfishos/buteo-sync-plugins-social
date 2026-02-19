@@ -21,7 +21,7 @@ DEFINES += 'SYNC_DATABASE_DIR=\'\"Sync\"\''
 
 INCLUDEPATH += . $$PWD/common/
 
-LIBS += -L$$PWD/common -lsyncpluginscommon
+LIBS += -L$$PWD/common -lbuteosocialcommon
 
 contains(DEFINES, 'SOCIALD_USE_QTPIM') {
     DEFINES *= USE_CONTACTS_NAMESPACE=QTCONTACTS_USE_NAMESPACE
