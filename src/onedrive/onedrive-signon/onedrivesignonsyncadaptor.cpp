@@ -170,11 +170,11 @@ void OneDriveSignonSyncAdaptor::refreshTokens(int accountId)
     signonSessionData.insert("ClientId", clientId());
     signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(initialSignonResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &OneDriveSignonSyncAdaptor::initialSignonResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signonError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &OneDriveSignonSyncAdaptor::signonError,
             Qt::UniqueConnection);
 
     incrementSemaphore(accountId);
@@ -200,11 +200,11 @@ void OneDriveSignonSyncAdaptor::initialSignonResponse(const SignOn::SessionData 
         return;
     }
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(forceTokenExpiryResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &OneDriveSignonSyncAdaptor::forceTokenExpiryResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signonError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &OneDriveSignonSyncAdaptor::signonError,
             Qt::UniqueConnection);
 
     QString mechanism = session->property("mechanism").toString();
@@ -247,11 +247,11 @@ void OneDriveSignonSyncAdaptor::triggerRefresh()
     QVariantMap signonSessionData = timer->property("signonSessionData").toMap();
 
     SignOn::AuthSession *session = timer->property("session").value<SignOn::AuthSession*>();
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(refreshTokenResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &OneDriveSignonSyncAdaptor::refreshTokenResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signonError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &OneDriveSignonSyncAdaptor::signonError,
             Qt::UniqueConnection);
 
     session->process(SignOn::SessionData(signonSessionData), mechanism);

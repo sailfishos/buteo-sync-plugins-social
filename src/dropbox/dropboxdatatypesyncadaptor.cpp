@@ -235,11 +235,11 @@ void DropboxDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     signonSessionData.insert("ClientSecret", clientSecret());
     signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(signOnResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &DropboxDataTypeSyncAdaptor::signOnResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signOnError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &DropboxDataTypeSyncAdaptor::signOnError,
             Qt::UniqueConnection);
 
     session->setProperty("account", QVariant::fromValue<Accounts::Account*>(account));
