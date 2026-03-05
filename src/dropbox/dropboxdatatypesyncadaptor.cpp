@@ -102,7 +102,8 @@ void DropboxDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
     int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (err == QNetworkReply::AuthenticationRequiredError) {
         qCInfo(lcSocialPlugin) << "sociald:Dropbox: would normally set CredentialsNeedUpdate for account"
-                         << reply->property("accountId").toInt() << "but could be spurious. Http code:" << httpCode;
+                               << reply->property("accountId").toInt()
+                               << "but could be spurious. Http code:" << httpCode;
     }
 
     qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
@@ -190,8 +191,10 @@ void DropboxDataTypeSyncAdaptor::setCredentialsNeedUpdate(Accounts::Account *acc
     qWarning() << "sociald:Dropbox: setting CredentialsNeedUpdate to true for account:" << account->id();
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
-    account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
-    account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("sociald-dropbox")));
+    account->setValue(QStringLiteral("CredentialsNeedUpdate"),
+                      QVariant::fromValue<bool>(true));
+    account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"),
+                      QVariant::fromValue<QString>(QString::fromLatin1("sociald-dropbox")));
     account->selectService(Accounts::Service());
     account->syncAndBlock();
 }

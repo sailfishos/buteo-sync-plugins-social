@@ -24,8 +24,8 @@
 #include "socialnetworksyncadaptor.h"
 
 OneDriveBackupQueryPlugin::OneDriveBackupQueryPlugin(const QString& pluginName,
-                             const Buteo::SyncProfile& profile,
-                             Buteo::PluginCbInterface *callbackInterface)
+                                                     const Buteo::SyncProfile& profile,
+                                                     Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
                          QStringLiteral("onedrive"),
                          SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::BackupQuery))

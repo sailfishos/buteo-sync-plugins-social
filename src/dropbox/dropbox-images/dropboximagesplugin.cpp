@@ -23,8 +23,8 @@
 #include "socialnetworksyncadaptor.h"
 
 DropboxImagesPlugin::DropboxImagesPlugin(const QString& pluginName,
-                             const Buteo::SyncProfile& profile,
-                             Buteo::PluginCbInterface *callbackInterface)
+                                         const Buteo::SyncProfile& profile,
+                                         Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
                          QStringLiteral("dropbox"),
                          SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::Images))

@@ -24,8 +24,8 @@
 #include "socialnetworksyncadaptor.h"
 
 OneDriveBackupRestorePlugin::OneDriveBackupRestorePlugin(const QString& pluginName,
-                             const Buteo::SyncProfile& profile,
-                             Buteo::PluginCbInterface *callbackInterface)
+                                                         const Buteo::SyncProfile& profile,
+                                                         Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
                          QStringLiteral("onedrive"),
                          SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::BackupRestore))
@@ -40,7 +40,6 @@ SocialNetworkSyncAdaptor *OneDriveBackupRestorePlugin::createSocialNetworkSyncAd
 {
     return new OneDriveBackupRestoreSyncAdaptor(this);
 }
-
 
 Buteo::ClientPlugin* OneDriveBackupRestorePluginLoader::createClientPlugin(
         const QString& pluginName,

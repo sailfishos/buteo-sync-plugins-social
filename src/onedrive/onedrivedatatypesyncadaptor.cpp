@@ -43,7 +43,8 @@
 #include <SignOn/SessionData>
 
 OneDriveDataTypeSyncAdaptor::OneDriveDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
-    : SocialNetworkSyncAdaptor("onedrive", dataType, 0, parent), m_triedLoading(false)
+    : SocialNetworkSyncAdaptor("onedrive", dataType, 0, parent)
+    , m_triedLoading(false)
 {
 }
 
@@ -164,8 +165,10 @@ void OneDriveDataTypeSyncAdaptor::setCredentialsNeedUpdate(Accounts::Account *ac
     qWarning() << "sociald:OneDrive: setting CredentialsNeedUpdate to true for account:" << account->id();
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
-    account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
-    account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("sociald-onedrive")));
+    account->setValue(QStringLiteral("CredentialsNeedUpdate"),
+                      QVariant::fromValue<bool>(true));
+    account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"),
+                      QVariant::fromValue<QString>(QString::fromLatin1("sociald-onedrive")));
     account->selectService(Accounts::Service());
     account->syncAndBlock();
 }
@@ -182,7 +185,9 @@ void OneDriveDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     // grab out a valid identity for the sync service.
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
-    SignOn::Identity *identity = account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(account->credentialsId()) : 0;
+    SignOn::Identity *identity = account->credentialsId() > 0
+            ? SignOn::Identity::existingIdentity(account->credentialsId())
+            : nullptr;
     if (!identity) {
         qCWarning(lcSocialPlugin) << "account" << accountId << "has no valid credentials; cannot sign in";
         decrementSemaphore(accountId);

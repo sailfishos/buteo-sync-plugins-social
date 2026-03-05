@@ -23,8 +23,8 @@
 #include "socialnetworksyncadaptor.h"
 
 OneDriveSignonPlugin::OneDriveSignonPlugin(const QString& pluginName,
-                             const Buteo::SyncProfile& profile,
-                             Buteo::PluginCbInterface *callbackInterface)
+                                           const Buteo::SyncProfile& profile,
+                                           Buteo::PluginCbInterface *callbackInterface)
     : SocialdButeoPlugin(pluginName, profile, callbackInterface,
                          QStringLiteral("onedrive"),
                          SocialNetworkSyncAdaptor::dataTypeName(SocialNetworkSyncAdaptor::Signon))
@@ -40,10 +40,9 @@ SocialNetworkSyncAdaptor *OneDriveSignonPlugin::createSocialNetworkSyncAdaptor()
     return new OneDriveSignonSyncAdaptor(this);
 }
 
-Buteo::ClientPlugin* OneDriveSignonPluginLoader::createClientPlugin(
-        const QString& pluginName,
-        const Buteo::SyncProfile& profile,
-        Buteo::PluginCbInterface* cbInterface)
+Buteo::ClientPlugin* OneDriveSignonPluginLoader::createClientPlugin(const QString& pluginName,
+                                                                    const Buteo::SyncProfile& profile,
+                                                                    Buteo::PluginCbInterface* cbInterface)
 {
     return new OneDriveSignonPlugin(pluginName, profile, cbInterface);
 }
