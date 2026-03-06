@@ -326,11 +326,13 @@ void OneDriveBackupOperationSyncAdaptor::listOperationFinished()
         // Directory may be not found or be empty if user has deleted backups. Only emit the error
         // signal if parsing failed or there was an unexpected error code.
         if (!ok) {
+            debugDumpResponse(data);
             errorMessage = QStringLiteral("Failed to parse directory listing at %1 for account %2")
                     .arg(remotePath).arg(accountId);
         } else if (httpCode != 200
                    && httpCode != 404
                    && httpCode != 410) {
+            debugDumpResponse(data);
             errorMessage = QStringLiteral("Directory listing request at %1 for account %2 failed, http code: %3")
                     .arg(remotePath).arg(accountId).arg(httpCode);
         }
