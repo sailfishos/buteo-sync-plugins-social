@@ -22,4 +22,3 @@
 
 Q_LOGGING_CATEGORY(lcSocialPlugin, "buteo.plugin.social", QtWarningMsg)
 Q_LOGGING_CATEGORY(lcSocialPluginTrace, "buteo.plugin.social.trace", QtWarningMsg)
-

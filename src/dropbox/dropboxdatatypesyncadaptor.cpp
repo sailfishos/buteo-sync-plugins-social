@@ -102,7 +102,8 @@ void DropboxDataTypeSyncAdaptor::errorHandler(QNetworkReply::NetworkError err)
     int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (err == QNetworkReply::AuthenticationRequiredError) {
         qCInfo(lcSocialPlugin) << "sociald:Dropbox: would normally set CredentialsNeedUpdate for account"
-                         << reply->property("accountId").toInt() << "but could be spurious. Http code:" << httpCode;
+                               << reply->property("accountId").toInt()
+                               << "but could be spurious. Http code:" << httpCode;
     }
 
     qCWarning(lcSocialPlugin) << SocialNetworkSyncAdaptor::dataTypeName(m_dataType)
@@ -190,8 +191,10 @@ void DropboxDataTypeSyncAdaptor::setCredentialsNeedUpdate(Accounts::Account *acc
     qWarning() << "sociald:Dropbox: setting CredentialsNeedUpdate to true for account:" << account->id();
     Accounts::Service srv(m_accountManager->service(syncServiceName()));
     account->selectService(srv);
-    account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
-    account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("sociald-dropbox")));
+    account->setValue(QStringLiteral("CredentialsNeedUpdate"),
+                      QVariant::fromValue<bool>(true));
+    account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"),
+                      QVariant::fromValue<QString>(QString::fromLatin1("sociald-dropbox")));
     account->selectService(Accounts::Service());
     account->syncAndBlock();
 }
@@ -232,11 +235,11 @@ void DropboxDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     signonSessionData.insert("ClientSecret", clientSecret());
     signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(signOnResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &DropboxDataTypeSyncAdaptor::signOnResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signOnError(SignOn::Error)),
+    connect(session, &SignOn::AuthSession::error,
+            this, &DropboxDataTypeSyncAdaptor::signOnError,
             Qt::UniqueConnection);
 
     session->setProperty("account", QVariant::fromValue<Accounts::Account*>(account));

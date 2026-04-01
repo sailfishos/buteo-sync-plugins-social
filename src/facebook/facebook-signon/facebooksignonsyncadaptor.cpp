@@ -260,11 +260,11 @@ void FacebookSignonSyncAdaptor::forceTokenExpiry(int seconds, int accountId, con
         signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
         signonSessionData.insert("ProvidedTokens", providedTokens);
 
-        connect(session, SIGNAL(response(SignOn::SessionData)),
-                this, SLOT(forceTokenExpiryResponse(SignOn::SessionData)),
+        connect(session, &SignOn::AuthSession::response,
+                this, &FacebookSignonSyncAdaptor::forceTokenExpiryResponse,
                 Qt::UniqueConnection);
-        connect(session, SIGNAL(error(SignOn::Error)),
-                this, SLOT(forceTokenExpiryError(SignOn::Error)),
+        connect(session, &SignOn::AuthSession::error,
+                this, &FacebookSignonSyncAdaptor::forceTokenExpiryError,
                 Qt::UniqueConnection);
 
         incrementSemaphore(accountId);

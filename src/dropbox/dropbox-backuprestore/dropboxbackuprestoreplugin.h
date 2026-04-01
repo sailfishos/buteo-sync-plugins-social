@@ -32,8 +32,8 @@ class Q_DECL_EXPORT DropboxBackupRestorePlugin : public SocialdButeoPlugin
 
 public:
     DropboxBackupRestorePlugin(const QString& pluginName,
-                  const Buteo::SyncProfile& profile,
-                  Buteo::PluginCbInterface *cbInterface);
+                               const Buteo::SyncProfile& profile,
+                               Buteo::PluginCbInterface *cbInterface);
     ~DropboxBackupRestorePlugin();
 
 protected:

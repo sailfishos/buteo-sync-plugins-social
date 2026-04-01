@@ -50,7 +50,8 @@
 #include <SignOn/SessionData>
 
 TwitterDataTypeSyncAdaptor::TwitterDataTypeSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
-    : SocialNetworkSyncAdaptor("twitter", dataType, 0, parent), m_triedLoading(false)
+    : SocialNetworkSyncAdaptor("twitter", dataType, 0, parent)
+    , m_triedLoading(false)
 {
 }
 
@@ -345,11 +346,11 @@ void TwitterDataTypeSyncAdaptor::signIn(Accounts::Account *account)
     signonSessionData.insert("ConsumerSecret", secret);
     signonSessionData.insert("UiPolicy", SignOn::NoUserInteractionPolicy);
 
-    connect(session, SIGNAL(response(SignOn::SessionData)),
-            this, SLOT(signOnResponse(SignOn::SessionData)),
+    connect(session, &SignOn::AuthSession::response,
+            this, &TwitterDataTypeSyncAdaptor::signOnResponse,
             Qt::UniqueConnection);
-    connect(session, SIGNAL(error(SignOn::Error)),
-            this, SLOT(signOnError(SignOn::Error)),
+    connect(session,  &SignOn::AuthSession::error,
+            this, &TwitterDataTypeSyncAdaptor::signOnError,
             Qt::UniqueConnection);
 
     session->setProperty("account", QVariant::fromValue<Accounts::Account*>(account));

@@ -159,9 +159,13 @@ void DropboxImageSyncAdaptor::queryCameraRollCursor(int accountId, const QString
     if (reply) {
         reply->setProperty("accountId", accountId);
         reply->setProperty("accessToken", accessToken);
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
-        connect(reply, SIGNAL(finished()), this, SLOT(cameraRollCursorFinishedHandler()));
+
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)),
+                this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, SIGNAL(finished()),
+                this, SLOT(cameraRollCursorFinishedHandler()));
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
         incrementSemaphore(accountId);
@@ -255,9 +259,12 @@ void DropboxImageSyncAdaptor::queryCameraRoll(int accountId, const QString &acce
         reply->setProperty("accessToken", accessToken);
         reply->setProperty("albumId", albumId);
         reply->setProperty("cursor", cursor);
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
-        connect(reply, SIGNAL(finished()), this, SLOT(cameraRollFinishedHandler()));
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)),
+                this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, SIGNAL(finished()),
+                this, SLOT(cameraRollFinishedHandler()));
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
         incrementSemaphore(accountId);
@@ -376,7 +383,8 @@ void DropboxImageSyncAdaptor::cameraRollFinishedHandler()
             if (haveAlreadyCachedImage(photoId, imageSrcUrl)) {
                 qCDebug(lcSocialPlugin) << "have previously cached photo" << photoId << ":" << imageSrcUrl;
             } else {
-                qCDebug(lcSocialPlugin) << "caching new photo" << photoId << ":" << imageSrcUrl << "->" << imageWidth << "x" << imageHeight;
+                qCDebug(lcSocialPlugin) << "caching new photo" << photoId << ":" << imageSrcUrl
+                                        << "->" << imageWidth << "x" << imageHeight;
                 m_db.addImage(photoId, albumId, userId, createdTime, updatedTime,
                               photoName, imageWidth, imageHeight, thumbnailUrl, imageSrcUrl, accessToken);
             }

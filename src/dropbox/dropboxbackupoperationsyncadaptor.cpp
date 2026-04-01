@@ -44,7 +44,8 @@ void debugDumpResponse(const QByteArray &data)
 }
 
 
-DropboxBackupOperationSyncAdaptor::DropboxBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType, QObject *parent)
+DropboxBackupOperationSyncAdaptor::DropboxBackupOperationSyncAdaptor(SocialNetworkSyncAdaptor::DataType dataType,
+                                                                     QObject *parent)
     : DropboxDataTypeSyncAdaptor(dataType, parent)
     , m_sailfishBackup(new QDBusInterface("org.sailfishos.backup", "/sailfishbackup", "org.sailfishos.backup",
                                           QDBusConnection::sessionBus(), this))
@@ -102,9 +103,11 @@ void DropboxBackupOperationSyncAdaptor::beginSync(int accountId, const QString &
         QDBusReply<QString> createBackupReply =
                 m_sailfishBackup->call("createBackupForSyncProfile", m_accountSyncProfile->name());
         if (!createBackupReply.isValid() || createBackupReply.value().isEmpty()) {
-            qCWarning(lcSocialPlugin) << "Call to createBackupForSyncProfile() failed:" << createBackupReply.error().name()
-                              << createBackupReply.error().message();
+            qCWarning(lcSocialPlugin) << "Call to createBackupForSyncProfile() failed:"
+                                      << createBackupReply.error().name()
+                                      << createBackupReply.error().message();
             setStatus(SocialNetworkSyncAdaptor::Error);
+
             return;
         }
 
@@ -116,10 +119,8 @@ void DropboxBackupOperationSyncAdaptor::beginSync(int accountId, const QString &
         break;
     }
     case BackupQuery:
-    {
         requestList(accountId, accessToken, m_remoteDirPath, QString(), QVariantMap());
         break;
-    }
     case BackupRestore:
     {
         const QString filePath = m_accountSyncProfile->key(QStringLiteral("sfos-backuprestore-file"));
@@ -156,7 +157,8 @@ void DropboxBackupOperationSyncAdaptor::beginSyncOperation(int accountId, const 
 
     // either upsync or downsync as required.
     if (operation() == Backup) {
-        uploadData(accountId, accessToken, m_localFileInfo.absolutePath(), m_remoteDirPath, m_localFileInfo.fileName());
+        uploadData(accountId, accessToken, m_localFileInfo.absolutePath(),
+                   m_remoteDirPath, m_localFileInfo.fileName());
     } else if (operation() == BackupRestore) {
         // step one: get the remote path and its children metadata.
         // step two: for each (non-folder) child in metadata, download it.
@@ -183,7 +185,8 @@ void DropboxBackupOperationSyncAdaptor::cloudBackupStatusChanged(int accountId, 
     if (status == QLatin1String("UploadingBackup")) {
 
         if (!m_localFileInfo.exists()) {
-            qCWarning(lcSocialPlugin) << "Backup finished, but cannot find the backup file:" << m_localFileInfo.absoluteFilePath();
+            qCWarning(lcSocialPlugin) << "Backup finished, but cannot find the backup file:"
+                                      << m_localFileInfo.absoluteFilePath();
             setStatus(SocialNetworkSyncAdaptor::Error);
             decrementSemaphore(m_accountId);
             return;
@@ -221,7 +224,8 @@ void DropboxBackupOperationSyncAdaptor::cloudRestoreStatusChanged(int accountId,
         return;
     }
 
-    qCDebug(lcSocialPlugin) << "Backup restore status changed:" << status << "for file:" << m_localFileInfo.absoluteFilePath();
+    qCDebug(lcSocialPlugin) << "Backup restore status changed:" << status
+                            << "for file:" << m_localFileInfo.absoluteFilePath();
 
     if (status == QLatin1String("Canceled")) {
         qCWarning(lcSocialPlugin) << "Cloud backup restore was canceled";
@@ -235,7 +239,8 @@ void DropboxBackupOperationSyncAdaptor::cloudRestoreStatusChanged(int accountId,
     }
 }
 
-void DropboxBackupOperationSyncAdaptor::cloudRestoreError(int accountId, const QString &error, const QString &errorString)
+void DropboxBackupOperationSyncAdaptor::cloudRestoreError(int accountId, const QString &error,
+                                                          const QString &errorString)
 {
     if (accountId != m_accountId) {
         return;
@@ -278,7 +283,8 @@ void DropboxBackupOperationSyncAdaptor::requestList(int accountId,
     req.setRawHeader("Authorization",
                      QByteArray("Bearer ") + accessToken.toUtf8());
 
-    qCDebug(lcSocialPlugin) << "performing directory request:" << url.toString() << ":" << remotePath << continuationCursor;
+    qCDebug(lcSocialPlugin) << "performing directory request:" << url.toString()
+                            << ":" << remotePath << continuationCursor;
 
     QNetworkReply *reply = m_networkAccessManager->post(req, postData);
     if (reply) {
@@ -289,9 +295,12 @@ void DropboxBackupOperationSyncAdaptor::requestList(int accountId,
              it != extraProperties.constEnd(); ++it) {
             reply->setProperty(it.key().toUtf8().constData(), it.value());
         }
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
-        connect(reply, SIGNAL(finished()), this, SLOT(remotePathFinishedHandler()));
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)),
+                this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, SIGNAL(finished()),
+                this, SLOT(remotePathFinishedHandler()));
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
         incrementSemaphore(accountId);
@@ -315,7 +324,8 @@ void DropboxBackupOperationSyncAdaptor::remotePathFinishedHandler()
 
     if (isError) {
         // Show error but don't set error status until error code is checked more thoroughly.
-        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote path request for Dropbox account" << accountId;
+        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote path request for Dropbox account"
+                                  << accountId;
         debugDumpResponse(data);
     }
 
@@ -333,12 +343,16 @@ void DropboxBackupOperationSyncAdaptor::remotePathFinishedHandler()
         // Directory may be not found or be empty if user has deleted backups. Only set the error
         // status if parsing failed or if there was an unexpected error code.
         if (!ok) {
-            errorMessage = QStringLiteral("Failed to parse directory listing at %1 for account %2").arg(remotePath).arg(accountId);
+            errorMessage = QStringLiteral("Failed to parse directory listing at %1 for account %2")
+                               .arg(remotePath)
+                               .arg(accountId);
         } else if (httpCode != 200
                    && httpCode != 404
                    && httpCode != 409   // Dropbox error when requested path is not found
                    && httpCode != 410) {
-            errorMessage = QStringLiteral("Directory listing request at %1 for account %2 failed").arg(remotePath).arg(accountId);
+            errorMessage = QStringLiteral("Directory listing request at %1 for account %2 failed")
+                               .arg(remotePath)
+                               .arg(accountId);
         }
 
         if (errorMessage.isEmpty()) {
@@ -358,10 +372,12 @@ void DropboxBackupOperationSyncAdaptor::remotePathFinishedHandler()
         const QString tag = child.toObject().value(".tag").toString();
         const QString childPath = child.toObject().value("path_display").toString();
         if (tag.compare("folder", Qt::CaseInsensitive) == 0) {
-            qCDebug(lcSocialPlugin) << "ignoring folder:" << childPath << "under remote backup path:" << remotePath
+            qCDebug(lcSocialPlugin) << "ignoring folder:" << childPath
+                                    << "under remote backup path:" << remotePath
                                     << "for Dropbox account:" << accountId;
         } else if (tag.compare("file", Qt::CaseInsensitive) == 0){
-            qCDebug(lcSocialPlugin) << "found remote backup object:" << childPath << "for Dropbox account:" << accountId;
+            qCDebug(lcSocialPlugin) << "found remote backup object:" << childPath
+                                    << "for Dropbox account:" << accountId;
             m_backupFiles.insert(childPath);
         }
     }
@@ -441,7 +457,8 @@ void DropboxBackupOperationSyncAdaptor::requestData(int accountId,
     fileQueryObject.insert("path", remoteFile);
     QByteArray fileQueryArg = QJsonDocument(fileQueryObject).toJson(QJsonDocument::Compact);
 
-    QUrl url(QStringLiteral("%1/2/files/download?arg=%2").arg(content(), QString::fromUtf8(fileQueryArg.toPercentEncoding())));
+    QUrl url(QStringLiteral("%1/2/files/download?arg=%2").arg(content(),
+                                                              QString::fromUtf8(fileQueryArg.toPercentEncoding())));
     QNetworkRequest req;
     req.setUrl(url);
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
@@ -457,10 +474,14 @@ void DropboxBackupOperationSyncAdaptor::requestData(int accountId,
         reply->setProperty("localPath", localPath);
         reply->setProperty("remotePath", remotePath);
         reply->setProperty("remoteFile", remoteFile);
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
-        connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(downloadProgressHandler(qint64,qint64)));
-        connect(reply, SIGNAL(finished()), this, SLOT(remoteFileFinishedHandler()));
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)),
+                this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, SIGNAL(downloadProgress(qint64,qint64)),
+                this, SLOT(downloadProgressHandler(qint64,qint64)));
+        connect(reply, SIGNAL(finished()),
+                this, SLOT(remoteFileFinishedHandler()));
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
         incrementSemaphore(accountId);
@@ -484,7 +505,8 @@ void DropboxBackupOperationSyncAdaptor::remoteFileFinishedHandler()
 
     removeReplyTimeout(accountId, reply);
     if (isError) {
-        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote file request for Dropbox account" << accountId;
+        qCWarning(lcSocialPlugin) << "error occurred when performing Backup remote file request for Dropbox account"
+                                  << accountId;
         debugDumpResponse(data);
         setStatus(SocialNetworkSyncAdaptor::Error);
         decrementSemaphore(accountId);
@@ -530,12 +552,14 @@ void DropboxBackupOperationSyncAdaptor::uploadData(int accountId, const QString 
     // step one: ensure the remote path exists (and if not, create it)
     // step two: upload every single file from the local path to the remote path.
 
-    QNetworkReply *reply = 0;
+    QNetworkReply *reply = nullptr;
+
     if (localFile.isEmpty()) {
         // attempt to create the remote path directory.
         QJsonObject requestParameters;
-        requestParameters.insert("path", remotePath.startsWith(QLatin1String("/")) ? remotePath
-                                                                                   : QStringLiteral("/%1").arg(remotePath));
+        requestParameters.insert("path",
+                                 remotePath.startsWith(QLatin1String("/"))
+                                     ? remotePath : QStringLiteral("/%1").arg(remotePath));
         requestParameters.insert("autorename", false);
         QJsonDocument doc;
         doc.setObject(requestParameters);
@@ -582,7 +606,8 @@ void DropboxBackupOperationSyncAdaptor::uploadData(int accountId, const QString 
             req.setRawHeader("Dropbox-API-Arg", requestParamData);
             req.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
             req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-            qCDebug(lcSocialPlugin) << "Attempting to create the remote file:" << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
+            qCDebug(lcSocialPlugin) << "Attempting to create the remote file:"
+                                    << QStringLiteral("%1/%2").arg(remotePath).arg(localFile)
                                     << "via request:" << url.toString();
             reply = m_networkAccessManager->post(req, data);
         }
@@ -594,20 +619,28 @@ void DropboxBackupOperationSyncAdaptor::uploadData(int accountId, const QString 
         reply->setProperty("localPath", localPath);
         reply->setProperty("remotePath", remotePath);
         reply->setProperty("localFile", localFile);
-        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorHandler(QNetworkReply::NetworkError)));
-        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
+
+        connect(reply, SIGNAL(error(QNetworkReply::NetworkError)),
+                this, SLOT(errorHandler(QNetworkReply::NetworkError)));
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)),
+                this, SLOT(sslErrorsHandler(QList<QSslError>)));
+
         if (localFile.isEmpty()) {
-            connect(reply, SIGNAL(finished()), this, SLOT(createRemotePathFinishedHandler()));
+            connect(reply, SIGNAL(finished()),
+                    this, SLOT(createRemotePathFinishedHandler()));
         } else {
-            connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(uploadProgressHandler(qint64,qint64)));
-            connect(reply, SIGNAL(finished()), this, SLOT(createRemoteFileFinishedHandler()));
+            connect(reply, SIGNAL(uploadProgress(qint64,qint64)),
+                    this, SLOT(uploadProgressHandler(qint64,qint64)));
+            connect(reply, SIGNAL(finished()),
+                    this, SLOT(createRemoteFileFinishedHandler()));
         }
 
         // we're requesting data.  Increment the semaphore so that we know we're still busy.
         incrementSemaphore(accountId);
         setupReplyTimeout(accountId, reply, 10 * 60 * 1000); // 10 minutes
     } else {
-        qCWarning(lcSocialPlugin) << "unable to create upload request:" << localPath << localFile << "->" << remotePath
+        qCWarning(lcSocialPlugin) << "unable to create upload request:"
+                                  << localPath << localFile << "->" << remotePath
                                   << "for Dropbox account with id" << accountId;
     }
 }
@@ -634,7 +667,8 @@ void DropboxBackupOperationSyncAdaptor::createRemotePathFinishedHandler()
             decrementSemaphore(accountId);
             return;
         } else {
-            qCDebug(lcSocialPlugin) << "remote path creation had conflict: already exists:" << remotePath << ".  Continuing.";
+            qCDebug(lcSocialPlugin) << "remote path creation had conflict: already exists:"
+                                    << remotePath << ".  Continuing.";
         }
     }
 
@@ -724,4 +758,3 @@ void DropboxBackupOperationSyncAdaptor::finalCleanup()
 {
     // nothing to do?
 }
-

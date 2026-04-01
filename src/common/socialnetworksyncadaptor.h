@@ -32,7 +32,6 @@
 
 #include "buteosyncfw_p.h"
 
-class QSqlDatabase;
 class QNetworkAccessManager;
 class QTimer;
 class QNetworkReply;
