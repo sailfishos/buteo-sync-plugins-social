@@ -28,6 +28,8 @@
 #include <QtCore/QStringList>
 #include <QtCore/QFileInfo>
 
+class QDBusInterface;
+
 class OneDriveBackupOperationSyncAdaptor : public OneDriveDataTypeSyncAdaptor
 {
     Q_OBJECT

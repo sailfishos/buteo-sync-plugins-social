@@ -80,6 +80,13 @@ Requires: %{name} = %{version}-%{release}
 Buteo sync plugin that stores locally created contacts, such as email
 recipients.
 
+%package devel
+Summary: Development files for social sync plugin common library
+Requires: %{name} = %{version}-%{release}
+
+%description devel
+Headers and pkg-config metadata for linking against libbuteosocialcommon.
+
 %package ts-devel
 Summary:    Translation source for sociald
 
@@ -262,8 +269,8 @@ done
 %{_libdir}/buteo-plugins-qt5/oopp/libsociald-client.so
 %config %{_sysconfdir}/buteo/profiles/client/sociald.xml
 %config %{_sysconfdir}/buteo/profiles/sync/sociald.All.xml
-%{_libdir}/libsyncpluginscommon.so.*
-%exclude %{_libdir}/libsyncpluginscommon.so
+%{_libdir}/libbuteosocialcommon.so.*
+%exclude %{_libdir}/libbuteosocialcommon.so
 %license COPYING
 
 %files facebook
@@ -367,6 +374,11 @@ done
 %config %{_sysconfdir}/buteo/profiles/sync/dropbox.Backup.xml
 %config %{_sysconfdir}/buteo/profiles/sync/dropbox.BackupQuery.xml
 %config %{_sysconfdir}/buteo/profiles/sync/dropbox.BackupRestore.xml
+
+%files devel
+%{_includedir}/buteosocialcommon/*.h
+%{_libdir}/libbuteosocialcommon.so
+%{_libdir}/pkgconfig/buteosocialcommon.pc
 
 %files knowncontacts
 %{_libdir}/buteo-plugins-qt5/oopp/libknowncontacts-client.so

@@ -25,6 +25,7 @@
 #include <QtCore/QDir>
 #include <QtCore/QUrl>
 #include <QtCore/QVariantMap>
+#include <QtCore/QJsonDocument>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QSslError>
 #include <QtDBus/QDBusConnection>
