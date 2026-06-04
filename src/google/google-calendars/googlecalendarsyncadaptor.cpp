@@ -22,6 +22,7 @@
 #include "googlecalendarsyncadaptor.h"
 #include "googlecalendarincidencecomparator.h"
 #include "trace.h"
+#include "buteosyncfw_p.h"
 
 #include <QtCore/QUrlQuery>
 #include <QtCore/QFile>
@@ -30,6 +31,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonDocument>
+#include <QtCore/QUuid>
 #include <QtCore/QSettings>
 #include <QtCore/QSet>
 

@@ -30,7 +30,10 @@
 #include <QtCore/QMap>
 #include <QtCore/QList>
 
-#include "buteosyncfw_p.h"
+// Buteo
+#include <SyncCommonDefs.h>
+#include <ProfileEngineDefs.h>
+#include <SyncProfile.h>
 
 class QNetworkAccessManager;
 class QTimer;

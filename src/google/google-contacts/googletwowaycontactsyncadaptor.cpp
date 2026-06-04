@@ -24,6 +24,7 @@
 
 #include "constants_p.h"
 #include "trace.h"
+#include "buteosyncfw_p.h"
 
 #include <twowaycontactsyncadaptor_impl.h>
 #include <qtcontacts-extensions_manager_impl.h>

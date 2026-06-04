@@ -21,11 +21,14 @@
 
 #include "facebookcalendarsyncadaptor.h"
 #include "trace.h"
+#include "buteosyncfw_p.h"
 
 #include <QtCore/QUrlQuery>
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QUuid>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
 #include <QtNetwork/QHttpMultiPart>

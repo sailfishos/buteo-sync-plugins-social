@@ -28,6 +28,7 @@
 #include <QtCore/QVariantMap>
 #include <QtCore/QByteArray>
 #include <QtCore/QUrlQuery>
+#include <QtCore/QJsonDocument>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>

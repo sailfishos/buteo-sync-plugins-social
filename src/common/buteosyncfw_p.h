@@ -22,6 +22,8 @@
 #ifndef SOCIALD_BUTEOSYNCFW_P_H
 #define SOCIALD_BUTEOSYNCFW_P_H
 
+#include <QStandardPaths>
+
 #include <SyncCommonDefs.h>
 #include <SyncPluginBase.h>
 #include <ProfileManager.h>
