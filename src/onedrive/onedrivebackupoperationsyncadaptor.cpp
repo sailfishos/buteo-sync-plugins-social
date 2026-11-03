@@ -898,8 +898,8 @@ void OneDriveBackupOperationSyncAdaptor::uploadData(int accountId, const QString
         QNetworkRequest req(url);
         req.setHeader(QNetworkRequest::ContentLengthHeader, data.size());
         req.setRawHeader(QByteArrayLiteral("Content-Range"), contentRange.toLatin1());
-        req.setRawHeader(QByteArrayLiteral("Authorization"),
-                         QByteArrayLiteral("Bearer ") + accessToken.toUtf8());
+        // The upload session URL is pre-authenticated: OneDrive personal accounts reject
+        // the chunk PUT with 401 Unauthenticated when an Authorization header is present.
         qCDebug(lcSocialPlugin) << "Attempting to upload" << contentRange << "of file:"
                           << m_localFileInfo.filePath()
                           << "via request:" << url.toString();
