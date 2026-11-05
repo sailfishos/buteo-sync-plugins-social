@@ -22,6 +22,9 @@
 #include "onedriveimagesyncadaptor.h"
 #include "trace.h"
 
+#include <Accounts/Account>
+#include <Accounts/Manager>
+
 #include <QtCore/QPair>
 #include <QtCore/QFile>
 #include <QtCore/QDir>
@@ -151,9 +154,20 @@ void OneDriveImageSyncAdaptor::finalize(int accountId)
     } else if (m_userId.isEmpty()) {
         qCWarning(lcSocialPlugin) << "no user id determined during sync, aborting";
     } else {
-        // Add user
-        if (m_db.user(m_userId).isNull()) {
-            m_db.addUser(m_userId, QDateTime::currentDateTime(), m_userDisplayName, accountId);
+        // Add or update user. Label it like the account (as shown in Settings > Accounts)
+        // so that several OneDrive accounts can be told apart in the gallery: the
+        // Microsoft display name is usually the same for all accounts of a person.
+        QString userName = m_userDisplayName;
+        Accounts::Account *account = Accounts::Account::fromId(m_accountManager, accountId, this);
+        if (account) {
+            if (!account->displayName().trimmed().isEmpty()) {
+                userName = account->displayName().trimmed();
+            }
+            account->deleteLater();
+        }
+        const OneDriveUser::ConstPtr dbUser = m_db.user(m_userId);
+        if (dbUser.isNull() || dbUser->userName() != userName) {
+            m_db.addUser(m_userId, QDateTime::currentDateTime(), userName, accountId);
         }
 
         // Add/update albums
