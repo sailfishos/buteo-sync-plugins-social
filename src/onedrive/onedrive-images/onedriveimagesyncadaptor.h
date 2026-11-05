@@ -56,9 +56,12 @@ protected: // implementing OneDriveDataTypeSyncAdaptor interface
 private:
     void requestResource(int accountId, const QString &accessToken, const QString &onedriveResource = QString());
     void requestNextLink(int accountId, const QString &accessToken, const QString &nextLink, bool isDefaultResource);
+    void requestThumbnail(int accountId, const QString &photoId, const QString &thumbnailUrl);
+    static QString thumbnailFilePath(const QString &photoId);
 
 private Q_SLOTS:
     void resourceFinishedHandler();
+    void thumbnailFinishedHandler();
 
 private:
     struct AlbumData {
@@ -118,6 +121,7 @@ private:
     QMap<QString, ImageData> m_imageData;
     QMap<QString, QSet<QString> > m_serverAlbumImageIds;
     QStringList m_removedImages;
+    QMap<QString, QString> m_thumbnailFiles; // photoId -> cached thumbnail file to record
 
     QString m_userId;
     QString m_userDisplayName;
