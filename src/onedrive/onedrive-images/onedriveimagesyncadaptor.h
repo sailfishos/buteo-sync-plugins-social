@@ -57,7 +57,7 @@ private:
     void requestResource(int accountId, const QString &accessToken, const QString &onedriveResource = QString());
     void requestNextLink(int accountId, const QString &accessToken, const QString &nextLink, bool isDefaultResource);
     void requestThumbnail(int accountId, const QString &photoId, const QString &thumbnailUrl);
-    static QString thumbnailFilePath(const QString &photoId);
+    static QString thumbnailFilePath(const QString &photoId, const QString &mimeType);
 
 private Q_SLOTS:
     void resourceFinishedHandler();

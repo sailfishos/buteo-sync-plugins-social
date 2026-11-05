@@ -449,14 +449,17 @@ void OneDriveImageSyncAdaptor::checkRemovedImages(const QString &albumId)
     m_removedImages.append(dbImageIds.toList());
 }
 
-QString OneDriveImageSyncAdaptor::thumbnailFilePath(const QString &photoId)
+QString OneDriveImageSyncAdaptor::thumbnailFilePath(const QString &photoId, const QString &mimeType)
 {
     // Same location and name as libsocialcache's OneDriveImageDownloader uses
     // for thumbnails (identifier = image id + ImageType::ThumbnailImage).
     const QString identifier = photoId + QLatin1Char('0');
     const QByteArray hash = QCryptographicHash::hash(identifier.toUtf8(), QCryptographicHash::Md5).toHex();
-    return QStringLiteral("%1/Images/OneDrive/%2/%3.jpg")
-            .arg(PRIVILEGED_DATA_DIR).arg(QLatin1Char(hash.at(0))).arg(identifier);
+    // The gallery picks the image format from the file name: keep the extension
+    // in line with the content (e.g. thumbnails of PNG screenshots are PNG).
+    const QString suffix = mimeType == QLatin1String("image/png") ? QStringLiteral("png") : QStringLiteral("jpg");
+    return QStringLiteral("%1/Images/OneDrive/%2/%3.%4")
+            .arg(PRIVILEGED_DATA_DIR).arg(QLatin1Char(hash.at(0))).arg(identifier).arg(suffix);
 }
 
 void OneDriveImageSyncAdaptor::requestThumbnail(int accountId, const QString &photoId, const QString &thumbnailUrl)
@@ -489,13 +492,14 @@ void OneDriveImageSyncAdaptor::thumbnailFinishedHandler()
     removeReplyTimeout(accountId, reply);
 
     static const QMimeDatabase mimeDatabase;
+    const QString mimeType = mimeDatabase.mimeTypeForData(data).name();
     if (error != QNetworkReply::NoError || data.isEmpty()
-            || !mimeDatabase.mimeTypeForData(data).name().startsWith(QStringLiteral("image/"))) {
+            || !mimeType.startsWith(QStringLiteral("image/"))) {
         // not fatal: the gallery downloads it on demand from the stable url
         qCWarning(lcSocialPlugin) << "unable to download thumbnail for OneDrive image" << photoId
                                   << "error:" << error << "HTTP code:" << httpCode;
     } else {
-        const QString path = thumbnailFilePath(photoId);
+        const QString path = thumbnailFilePath(photoId, mimeType);
         QDir().mkpath(QFileInfo(path).absolutePath());
         QFile file(path);
         if (file.open(QFile::WriteOnly) && file.write(data) == data.size()) {
