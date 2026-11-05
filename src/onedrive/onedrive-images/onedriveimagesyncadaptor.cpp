@@ -21,6 +21,7 @@
 
 #include "onedriveimagesyncadaptor.h"
 #include "trace.h"
+#include "buteosyncfw_p.h"
 
 #include <QtCore/QPair>
 #include <QtCore/QFile>
@@ -28,6 +29,9 @@
 #include <QtCore/QVariantMap>
 #include <QtCore/QByteArray>
 #include <QtCore/QUrlQuery>
+#include <QtCore/QCryptographicHash>
+#include <QtCore/QFileInfo>
+#include <QtCore/QMimeDatabase>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlQuery>
 #include <QtSql/QSqlError>
@@ -123,6 +127,8 @@ void OneDriveImageSyncAdaptor::sync(const QString &dataTypeString, int accountId
         return;
     }
 
+    m_thumbnailFiles.clear();
+
     // call superclass impl.
     OneDriveDataTypeSyncAdaptor::sync(dataTypeString, accountId);
 }
@@ -184,6 +190,13 @@ void OneDriveImageSyncAdaptor::finalize(int accountId)
                           data.photoName, data.imageWidth, data.imageHeight,
                           data.thumbnailUrl, data.imageSourceUrl, data.description,
                           accountId);
+        }
+
+        // Record the thumbnails downloaded (or kept) during this sync.
+        // Processed after the image inserts above, which reset thumbnailFile.
+        QMap<QString, QString>::const_iterator k;
+        for (k = m_thumbnailFiles.constBegin(); k != m_thumbnailFiles.constEnd(); ++k) {
+            m_db.updateImageThumbnail(k.key(), k.value());
         }
 
         m_db.commit();
@@ -317,7 +330,14 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
             const QString photoName = child.value("name").toString();
             const int imageWidth = child.value("image").toObject().value("width").toInt();
             const int imageHeight = child.value("image").toObject().value("height").toInt();
-            const QString photoThumbnailUrl = thumbnail.value("medium").toObject().value("url").toString();
+            // The thumbnail url returned by the server is pre-authenticated and expires
+            // after about an hour. Store the stable Graph url instead (it redirects to a
+            // fresh pre-authenticated url), and use the returned one only to download
+            // the thumbnail right now.
+            const QString downloadThumbnailUrl = thumbnail.value("medium").toObject().value("url").toString();
+            const QString photoThumbnailUrl = downloadThumbnailUrl.isEmpty()
+                    ? QString()
+                    : QStringLiteral("%1/me/drive/items/%2/thumbnails/0/medium/content").arg(api()).arg(photoId);
             const QString photoImageSrcUrl = QStringLiteral("%1%2%3%4%5")
                     .arg(api()).arg("/me").arg("/drive/items/").arg(photoId).arg("/content");
             const QString photoDescription = child.value("description").toString();
@@ -329,13 +349,26 @@ void OneDriveImageSyncAdaptor::resourceFinishedHandler()
 
             // now check to see if this image has changed server-side
             const OneDriveImage::ConstPtr &dbImage = m_db.image(photoId);
-            if (dbImage.isNull()
+            const bool imageChanged = dbImage.isNull()
                     || dbImage->imageId() != photoId
                     || dbImage->createdTime().toTime_t() < photoCreatedTime.toTime_t()
-                    || dbImage->updatedTime().toTime_t() < photoUpdatedTime.toTime_t()) {
-                // changed, need to update in our local db.
+                    || dbImage->updatedTime().toTime_t() < photoUpdatedTime.toTime_t();
+            if (imageChanged || dbImage->thumbnailUrl() != photoThumbnailUrl) {
+                // changed (or stored with an outdated thumbnail url), need to update in our local db.
                 qCDebug(lcSocialPlugin) << "Image:" << photoName << "in folder:" << albumName << "added or changed on server";
                 m_imageData.insert(photoId, image);
+            }
+
+            // Make sure the thumbnail is available locally, so that the gallery
+            // does not depend on a short-lived url to show it.
+            const QString existingThumbnail = dbImage.isNull() ? QString() : dbImage->thumbnailFile();
+            if (!imageChanged && !existingThumbnail.isEmpty() && QFile::exists(existingThumbnail)) {
+                if (m_imageData.contains(photoId)) {
+                    // re-inserted row: keep the existing file
+                    m_thumbnailFiles.insert(photoId, existingThumbnail);
+                }
+            } else if (!downloadThumbnailUrl.isEmpty()) {
+                requestThumbnail(accountId, photoId, downloadThumbnailUrl);
             }
         }
     }
@@ -414,4 +447,68 @@ void OneDriveImageSyncAdaptor::checkRemovedImages(const QString &albumId)
     }
 
     m_removedImages.append(dbImageIds.toList());
+}
+
+QString OneDriveImageSyncAdaptor::thumbnailFilePath(const QString &photoId, const QString &mimeType)
+{
+    // Same location and name as libsocialcache's OneDriveImageDownloader uses
+    // for thumbnails (identifier = image id + ImageType::ThumbnailImage).
+    const QString identifier = photoId + QLatin1Char('0');
+    const QByteArray hash = QCryptographicHash::hash(identifier.toUtf8(), QCryptographicHash::Md5).toHex();
+    // The gallery picks the image format from the file name: keep the extension
+    // in line with the content (e.g. thumbnails of PNG screenshots are PNG).
+    const QString suffix = mimeType == QLatin1String("image/png") ? QStringLiteral("png") : QStringLiteral("jpg");
+    return QStringLiteral("%1/Images/OneDrive/%2/%3.%4")
+            .arg(PRIVILEGED_DATA_DIR).arg(QLatin1Char(hash.at(0))).arg(identifier).arg(suffix);
+}
+
+void OneDriveImageSyncAdaptor::requestThumbnail(int accountId, const QString &photoId, const QString &thumbnailUrl)
+{
+    // pre-authenticated url: no Authorization header
+    QNetworkRequest req((QUrl(thumbnailUrl)));
+    QNetworkReply *reply = m_networkAccessManager->get(req);
+    if (reply) {
+        reply->setProperty("accountId", accountId);
+        reply->setProperty("photoId", photoId);
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsHandler(QList<QSslError>)));
+        connect(reply, SIGNAL(finished()), this, SLOT(thumbnailFinishedHandler()));
+        incrementSemaphore(accountId);
+        setupReplyTimeout(accountId, reply);
+    } else {
+        qCWarning(lcSocialPlugin) << "unable to request thumbnail for OneDrive image" << photoId;
+    }
+}
+
+void OneDriveImageSyncAdaptor::thumbnailFinishedHandler()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    const int accountId = reply->property("accountId").toInt();
+    const QString photoId = reply->property("photoId").toString();
+    const QNetworkReply::NetworkError error = reply->error();
+    const int httpCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray data = reply->readAll();
+    disconnect(reply);
+    reply->deleteLater();
+    removeReplyTimeout(accountId, reply);
+
+    static const QMimeDatabase mimeDatabase;
+    const QString mimeType = mimeDatabase.mimeTypeForData(data).name();
+    if (error != QNetworkReply::NoError || data.isEmpty()
+            || !mimeType.startsWith(QStringLiteral("image/"))) {
+        // not fatal: the gallery downloads it on demand from the stable url
+        qCWarning(lcSocialPlugin) << "unable to download thumbnail for OneDrive image" << photoId
+                                  << "error:" << error << "HTTP code:" << httpCode;
+    } else {
+        const QString path = thumbnailFilePath(photoId, mimeType);
+        QDir().mkpath(QFileInfo(path).absolutePath());
+        QFile file(path);
+        if (file.open(QFile::WriteOnly) && file.write(data) == data.size()) {
+            file.close();
+            m_thumbnailFiles.insert(photoId, path);
+        } else {
+            qCWarning(lcSocialPlugin) << "unable to write thumbnail" << path;
+        }
+    }
+
+    decrementSemaphore(accountId);
 }
